@@ -1,2 +1,5 @@
 venv
 *.env
+*.DS_Store
+*/codepaster.py
+*/__pycache__
