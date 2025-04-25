@@ -8,6 +8,7 @@ class AuthService {
    
 
     func requestOTP(email: String) -> AnyPublisher<AuthResponse.PatientSignUpResponse.OTPResponse, Error> {
+        print("Requesting OTP for email: \(email)")
         let endpoint = AuthEndpoint.PatientSignUp.requestOTP
         let url = URL(string: "\(AuthService.baseURL)\(endpoint)")!
 

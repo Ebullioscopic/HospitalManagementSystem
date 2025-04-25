@@ -13,8 +13,8 @@ struct AuthRequest {
             let email: String
             let otp: String
             let patient_name: String
-            let patient_phone: Int
-            let patient_password: String
+            let patient_mobile: Int
+            let password: String
         }
         
         struct UpdatePatientDetailsRequest: Codable {

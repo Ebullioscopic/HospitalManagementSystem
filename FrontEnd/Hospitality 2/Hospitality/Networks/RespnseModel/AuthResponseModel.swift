@@ -8,7 +8,7 @@ struct AuthResponse {
         
         struct OTPResponse: Codable {
             let message: String
-            let status: Bool
+            let status: String
         }
         
         struct SignUpResponse: Codable {
@@ -16,12 +16,12 @@ struct AuthResponse {
             let patient_id: Int
             let access_token: String
             let refresh_token: String
-            let status: Bool
+            // let status: Bool
         }
         
         struct UpdatePatientDetailsResponse: Codable {
             let message: String
-            let status: Bool
+            let created: String
         }
     }
     

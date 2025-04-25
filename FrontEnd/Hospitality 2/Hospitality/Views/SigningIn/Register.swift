@@ -1,6 +1,9 @@
 import SwiftUI
 import Combine
+
 struct Register: View {
+    @StateObject private var viewModel = UserSignupViewModel()
+    
     @State private var currentStep = 1
     @State private var name = ""
     @State private var phone = ""
@@ -9,7 +12,6 @@ struct Register: View {
     @State private var dob = Date()
     @State private var bloodGroup = ""
     @State private var gender: String?
-    @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
     @State private var navigateToHome = false
@@ -20,7 +22,6 @@ struct Register: View {
         case name, phone, email, otp
     }
     
-    private let authService = AuthenticationService()
     @State private var cancellables = Set<AnyCancellable>()
     
     var body: some View {
@@ -73,6 +74,27 @@ struct Register: View {
                 Button("OK") { showError = false }
             } message: {
                 Text(errorMessage)
+            }
+            .onChange(of: viewModel.errorMessage) { newValue in
+                if !newValue.isEmpty {
+                    showError(message: newValue)
+                }
+            }
+            .onChange(of: viewModel.otpRequestSuccess) { success in
+                if success {
+                    currentStep = 2
+                }
+            }
+            .onChange(of: viewModel.signupSuccess) { success in
+                if success {
+                    currentStep = 3
+                }
+            }
+            .onChange(of: viewModel.profileUpdateSuccess) { success in
+                if success {
+                    navigateToHome = true
+                    print("Profile updated successfully")
+                }
             }
         }
     }
@@ -179,6 +201,7 @@ struct Register: View {
         }
         .padding(.horizontal, 16)
     }
+    
     // MARK: - Continue Button
     @ViewBuilder
     private func ContinueButton() -> some View {
@@ -187,7 +210,7 @@ struct Register: View {
                 Text(currentStep == 3 ? "Complete Registration" : "Continue")
                     .font(.headline)
                 
-                if isLoading {
+                if viewModel.isLoading {
                     ProgressView()
                         .padding(.leading, 8)
                 } else {
@@ -206,10 +229,10 @@ struct Register: View {
                     ))
             )
             .shadow(color: Color(hex: "4A90E2").opacity(0.3), radius: 10, x: 0, y: 4)
-            .opacity(isLoading ? 0.8 : 1)
+            .opacity(viewModel.isLoading ? 0.8 : 1)
         }
         .buttonStyle(BouncyButtonStyle())
-        .disabled(isLoading)
+        .disabled(viewModel.isLoading)
     }
     
     // MARK: - Handlers
@@ -228,7 +251,6 @@ struct Register: View {
     }
     
     private func validateStep1() {
-       
         guard !name.isEmpty else {
             showError(message: "Please enter your full name")
             return
@@ -241,26 +263,8 @@ struct Register: View {
             showError(message: "Please enter your email address")
             return
         }
-        isLoading = true
-        authService.requestOTP(email: email)
-            .receive(on: DispatchQueue.main)
-                        .sink(receiveCompletion: { completion in
-                            isLoading = false
-                            switch completion {
-                            case .finished:
-                                break
-                            case .failure(let error):
-                                let errorMsg = (error as? NetworkError)?.localizedDescription ?? "Failed to send OTP. Please try again."
-                                showError(message: errorMsg)
-                            }
-                        }, receiveValue: { response in
-                            if response.status == "success" {
-                                currentStep = 2
-                            } else {
-                                showError(message: response.message)
-                            }
-                        })
-                        .store(in: &cancellables)
+        print("Button pressed")
+        viewModel.requestOTP(email: email)
     }
     
     private func validateStep2() {
@@ -269,56 +273,21 @@ struct Register: View {
             return
         }
         
-        isLoading = true
+        guard let phoneInt = Int(phone) else {
+            showError(message: "Invalid phone number format")
+            return
+        }
         
-        authService.verifyOTP(email: email, otp: otpCode, patientName: name, patientMobile: phone)
-            .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { completion in
-                isLoading = false
-                switch completion {
-                case .finished:
-                    break
-                case .failure(let error):
-                    print("🔴 OTP Verification Error: \(error)")
-                    let errorMsg = (error as? NetworkError)?.localizedDescription ?? "Failed to verify OTP. Please try again."
-                    showError(message: errorMsg)
-                }
-            }, receiveValue: { response in
-                // Print the entire response for debugging
-                print("🔍 Full authentication response: \(response)")
-                
-                // Store tokens in UserDefaults or a secure storage
-                if let token = response.access_token {
-                    // Print token before saving
-                    print("🔑 Received access token: \(token)")
-                    UserDefaults.standard.set(token, forKey: "accessToken")
-                } else {
-                    print("⚠️ No access token received")
-                }
-                
-                if let refreshToken = response.refresh_token {
-                    print("🔄 Received refresh token: \(refreshToken)")
-                    UserDefaults.standard.set(refreshToken, forKey: "refreshToken")
-                } else {
-                    print("⚠️ No refresh token received")
-                }
-                
-                if let patientId = response.patient_id {
-                    print("👤 Received patient ID: \(patientId)")
-                    UserDefaults.standard.set(patientId, forKey: "patientId")
-                } else {
-                    print("⚠️ No patient ID received")
-                }
-                
-                // Move to next step
-                currentStep = 3
-            })
-            .store(in: &cancellables)
+        viewModel.completeSignup(
+            email: email,
+            otp: otpCode,
+            patientName: name,
+            patientPhone: phoneInt,
+            patientPassword: "defaultPassword123" // Consider adding a password field or using a more secure approach
+        )
     }
     
     private func completeRegistration() {
-        // Validate date of birth (check if it's a reasonable date)
-        print("📦 All UserDefaults: \(UserDefaults.standard.dictionaryRepresentation())")
         let calendar = Calendar.current
         let currentYear = calendar.component(.year, from: Date())
         let dobYear = calendar.component(.year, from: dob)
@@ -333,34 +302,19 @@ struct Register: View {
             return
         }
         
-        guard let gender = gender, !gender.isEmpty else {
+        guard let genderString = gender, !genderString.isEmpty else {
             showError(message: "Please select gender")
             return
         }
         
-        isLoading = true
+        let genderBoolean = (genderString == "Male")
         
-        authService.updatePatientProfile(dob: dob, gender: gender, bloodGroup: bloodGroup)
-            .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { completion in
-                isLoading = false
-                switch completion {
-                case .finished:
-                    break
-                case .failure(let error):
-                    let errorMsg = (error as? NetworkError)?.localizedDescription ?? "Failed to update profile. Please try again."
-                    showError(message: errorMsg)
-                }
-            }, receiveValue: { response in
-                if response.created == true{
-                    // Profile updated successfully
-                    navigateToHome = true
-                    print("Profile updated successfully")
-                } else {
-                    showError(message: response.message)
-                }   
-            })
-            .store(in: &cancellables)
+        viewModel.updatePatientProfile(
+            patientDob: dob,
+            patientGender: genderBoolean,
+            patientBloodGroup: bloodGroup,
+            patientAddress: "Default Address" // You might want to add an address field to your form
+        )
     }
     
     private func showError(message: String) {
