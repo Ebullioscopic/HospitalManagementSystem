@@ -135,6 +135,18 @@ class PatientSignupService {
                       (200...299).contains(httpResponse.statusCode) else {
                     throw URLError(.badServerResponse)
                 }
+                
+                // Now let's decode to check the success field
+                let decoder = JSONDecoder()
+                let responseObj = try decoder.decode(AuthResponse.PatientSignUpResponse.UpdatePatientDetailsResponse.self, from: data)
+                
+                // If API returned success: false, throw an error with the message
+                if !responseObj.success {
+                    throw NSError(domain: "ProfileUpdateError", 
+                                 code: 0, 
+                                 userInfo: [NSLocalizedDescriptionKey: responseObj.message])
+                }
+                
                 return data
             }
             .decode(type: AuthResponse.PatientSignUpResponse.UpdatePatientDetailsResponse.self, decoder: JSONDecoder())

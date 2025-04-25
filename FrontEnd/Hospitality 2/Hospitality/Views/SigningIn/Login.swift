@@ -210,7 +210,6 @@ struct Login: View {
     @State private var keyboardHeight: CGFloat = 0
     @State private var keyboardVisible: Bool = false
     @State private var scrollOffset: CGFloat = 0
-    @State private var showRegistration = false
     
     enum Field: Hashable {
         case email, otp
@@ -252,10 +251,10 @@ struct Login: View {
                                 
                                 // Sign-up link card for patients
                                 if selectedRole == "Patient" {
-                                    RegistrationLinkCard(showRegistration: $showRegistration)
-                                                
+                                    RegistrationLinkCard()
                                 }
-            
+                                
+                                // Login button
                                 SignInButton(
                                     isLoading: $isLoading,
                                     scale: $scale,
@@ -305,7 +304,7 @@ struct Login: View {
                     .navigationBarBackButtonHidden(true)
             }
             .navigationDestination(isPresented: $navigateToAdminDashboard) {
-                AdminHomeView()
+                adminTabBarView()
                     .navigationBarBackButtonHidden(true)
             }
         }
@@ -889,7 +888,6 @@ struct FormCard: View {
 
 struct RegistrationLinkCard: View {
     @Environment(\.colorScheme) var colorScheme
-    @Binding var showRegistration: Bool
     @State private var isHovered = false
     
     var body: some View {
@@ -898,20 +896,19 @@ struct RegistrationLinkCard: View {
             Text("Don't have an account?")
                 .foregroundColor(colorScheme == .dark ? .gray : Color(hex: "4A5568"))
             
-            Button(action: {
-                showRegistration = true
-            }) {
+            NavigationLink(destination: Register()) {
                 Text("Register")
                     .foregroundColor(Color(hex: "4A90E2"))
                     .fontWeight(.semibold)
                     .scaleEffect(isHovered ? 1.05 : 1.0)
+                    .animation(.spring(response: 0.3), value: isHovered)
+                    .onTapGesture {
+                        isHovered = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            isHovered = false
+                        }
+                    }
             }
-            .buttonStyle(PlainButtonStyle())
-            .onHover { hovering in
-                isHovered = hovering
-            }
-            .animation(.spring(response: 0.3), value: isHovered)
-            
             Spacer()
         }
         .padding(.vertical, 15)
@@ -920,6 +917,7 @@ struct RegistrationLinkCard: View {
                 .fill(colorScheme == .dark ? Color(hex: "1E1E1E").opacity(0.6) : Color.white.opacity(0.8))
                 .shadow(color: colorScheme == .dark ? Color.black.opacity(0.2) : Color(hex: "4A90E2").opacity(0.15), radius: 12, x: 0, y: 3)
         )
+        // Adding beautiful card highlight
         .overlay(
             RoundedRectangle(cornerRadius: 15)
                 .strokeBorder(
@@ -939,9 +937,6 @@ struct RegistrationLinkCard: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Don't have an account? Register")
         .accessibilityHint("Navigates to registration screen")
-        .navigationDestination(isPresented: $showRegistration) {
-            Register()
-        }
     }
 }
 

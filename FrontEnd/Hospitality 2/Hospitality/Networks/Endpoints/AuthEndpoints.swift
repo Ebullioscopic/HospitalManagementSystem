@@ -17,6 +17,5 @@ struct AuthEndpoint {
         static let requestOTP = "/accounts/request-otp/"
         static let login = "/accounts/login/"
         
-        
     }
 }

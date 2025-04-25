@@ -121,9 +121,15 @@ class UserSignupViewModel: ObservableObject {
             }
         } receiveValue: { [weak self] response in
             guard let self = self else { return }
-            // UpdatePatientDetailsResponse has 'created' as String, not Bool
-            self.profileUpdateSuccess = response.created == "true" || response.created == "1"
+            
+            // Use the new success field directly instead of checking created string
+            self.profileUpdateSuccess = response.success
             self.profileUpdateMessage = response.message
+            
+            // If the response indicates failure, set error message
+            if !response.success {
+                self.errorMessage = response.message
+            }
         }
         .store(in: &cancellables)
     }

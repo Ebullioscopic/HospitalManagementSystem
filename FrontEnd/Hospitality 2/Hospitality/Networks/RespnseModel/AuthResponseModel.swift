@@ -22,6 +22,7 @@ struct AuthResponse {
         struct UpdatePatientDetailsResponse: Codable {
             let message: String
             let created: String
+            let success: Bool
         }
     }
     
