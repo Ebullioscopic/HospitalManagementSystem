@@ -43,7 +43,7 @@ class UserSignupViewModel: ObservableObject {
             } receiveValue: { [weak self] response in
                 guard let self = self else { return }
                 // Handle response based on actual model structure
-                self.otpRequestSuccess = response.status == "success" // status is a String
+                self.otpRequestSuccess = response.status == "success"
                 self.otpResponseMessage = response.message
             }
             .store(in: &cancellables)

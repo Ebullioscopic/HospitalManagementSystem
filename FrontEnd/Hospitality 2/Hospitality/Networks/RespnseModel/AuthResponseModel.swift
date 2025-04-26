@@ -16,7 +16,7 @@ struct AuthResponse {
             let patient_id: Int
             let access_token: String
             let refresh_token: String
-            // let status: Bool
+            let status: Bool
         }
         
         struct UpdatePatientDetailsResponse: Codable {
@@ -26,7 +26,7 @@ struct AuthResponse {
         }
     }
     
-    struct PatientLoginRequest {
+    struct PatientStaffLoginResponse {
         
         struct OTPResponse: Codable {
             let otp: String
@@ -39,7 +39,7 @@ struct AuthResponse {
             let user_type: String
             let access_token: String
             let refresh_token: String
-            let status: Bool
+            let success: Bool
         }
     }
     
@@ -60,21 +60,5 @@ struct AuthResponse {
         }
     }
     
-    struct StaffLoginResponse{
-        struct OtpResponse : Codable {
-            let message: String
-            let status: Bool
-        }
-        struct LoginResponse: Codable {
-            let message: String
-            let user_id: String
-            let user_type: String
-            let access_token: String
-            let refresh_token: String
-            let status: Bool
-        }
-
-
-    }
     
 }

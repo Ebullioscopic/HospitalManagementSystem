@@ -2,6 +2,6 @@ import SwiftUI
 import Foundation
 
 struct Constants {
-    static let baseURL = "https://hggzrg5w-8000.inc1.devtunnels.ms/api"
+    static let baseURL = "http://192.168.11.242:8000/api"
 
 }

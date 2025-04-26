@@ -25,7 +25,7 @@ struct AuthRequest {
         }
     }
     
-    struct PatientLoginRequest {
+    struct PatientStaffLoginRequest {
         
         struct OTPRequest: Codable {
             let email: String
@@ -38,7 +38,6 @@ struct AuthRequest {
         struct LoginRequest: Codable {
             let email: String
             let otp: String
-            //            let password: String
             let user_type: String
         }
     }
@@ -58,19 +57,6 @@ struct AuthRequest {
         }
     }
     
-    struct StaffLoginRequest{
-        struct OTPRequest: Codable {
-            let email: String
-            let user_type: String
-            let password: String
-            
-        }
-        struct LoginRequest: Codable {
-            let email: String
-            let otp: String
-            let user_type: String
-            
-        }
-    }
+    
     
 }

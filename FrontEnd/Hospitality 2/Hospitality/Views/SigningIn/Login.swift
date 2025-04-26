@@ -194,8 +194,9 @@ struct InfoFieldPassword: View {
 
 struct Login: View {
     @State private var email: String = ""
+    @State private var password: String = ""
     @State private var otpCode: String = ""
-    @State private var selectedRole: String = "Patient"
+    @State private var selectedRole: String = "patient"
     @State private var opacity: Double = 0.0
     @State private var scale: CGFloat = 0.8
     @State private var isLoading: Bool = false
@@ -204,65 +205,54 @@ struct Login: View {
     @State private var navigateToHomePatient: Bool = false
     @State private var navigateToAdminDashboard: Bool = false
     @State private var isOTPRequested: Bool = false
-    @Environment(\.colorScheme) var colorScheme
-    
-    @FocusState private var focusedField: Field?
+    @State private var isPasswordSubmitted: Bool = false
+    @Environment(\.colorScheme) var colorScheme    
     @State private var keyboardHeight: CGFloat = 0
     @State private var keyboardVisible: Bool = false
     @State private var scrollOffset: CGFloat = 0
+
+    @StateObject private var viewModel = PatientStaffLoginViewModel(userType: "patient")
     
-    enum Field: Hashable {
-        case email, otp
-    }
     
-    let roles = ["Admin", "Staff", "Patient"]
+    
+    
+    let roles = ["admin", "staff", "patient"]
     
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
                 ZStack(alignment: .top) {
-                    // Animated background
                     BackgroundView()
-                    
-                    // Sticky Header with Logo
                     StickyLogoHeaderView()
-                        .zIndex(1) // Keep it above other content
+                        .zIndex(1)
                     
-                    // Main content
                     ScrollView {
                         VStack(spacing: 90) {
-                            // Spacer to push content below the sticky header
                             Spacer()
                                 .frame(height: 140)
                             
-                            // Content Cards
                             VStack(spacing: 16) {
-                                // Main card with form
                                 FormCard(
                                     email: $email,
+                                    password: $password,
                                     otpCode: $otpCode,
                                     selectedRole: $selectedRole,
                                     isOTPRequested: $isOTPRequested,
-                                    focusedField: focusedField,
-                                    isFocusedEmail: focusedField == .email,
+                                    isPasswordSubmitted: $isPasswordSubmitted,
                                     requestOTP: requestOTP,
                                     isLoading: isLoading
                                 )
                                 
-                                // Sign-up link card for patients
-                                if selectedRole == "Patient" {
+                                if selectedRole == "patient" {
                                     RegistrationLinkCard()
                                 }
                                 
-                                // Login button
                                 SignInButton(
                                     isLoading: $isLoading,
                                     scale: $scale,
                                     isOTPRequested: isOTPRequested,
                                     action: loginAction
                                 )
-                                
-
                             }
                             .padding(.horizontal, 20)
                             .padding(.top, 20)
@@ -280,7 +270,8 @@ struct Login: View {
                 }
             }
             .onTapGesture {
-                focusedField = nil // Dismiss keyboard on tap
+                // Dismiss keyboard on tap
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
             .onAppear {
                 withAnimation(.easeInOut(duration: 0.8)) {
@@ -309,62 +300,106 @@ struct Login: View {
             }
         }
     }
-    
-    // MARK: - Functions
+    //Need to check this 
     private func requestOTP() {
         guard !email.isEmpty else {
             showError(message: "Please enter your email address")
             return
         }
-        
-        withAnimation(.easeInOut) {
-            isOTPRequested = true
-            focusedField = .otp
+        guard !password.isEmpty else {
+            showError(message: "Please enter your password")
+            return
         }
         
+        // Update viewModel's userType based on selected role before requesting OTP
+        viewModel.userType = selectedRole.lowercased()
+        
+        // Use the view model to request OTP
+        viewModel.requestOTP(email: email, password: password)
+        
+        // Set local isLoading to match the view model's isLoading state
         isLoading = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            isLoading = false
+        
+        // Monitor for results/errors
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if !viewModel.errorMessage.isEmpty {
+                showError(message: viewModel.errorMessage)
+                isLoading = false
+            } else if viewModel.otpRequestSuccess {
+                withAnimation(.easeInOut) {
+                    isPasswordSubmitted = true
+                    isOTPRequested = true
+                    isLoading = false
+                }
+            }
         }
     }
     
-    private func loginAction() {
-        guard !email.isEmpty else {
-            showError(message: "Please enter your email")
+   //Need to check this.
+   private func loginAction() {
+//    guard !email.isEmpty else {
+//        showError(message: "Please enter your email")
+//        return
+//    }
+    
+//    guard isPasswordSubmitted else {
+//        showError(message: "Please submit your password first")
+//        return
+//    }
+    
+    guard isOTPRequested else {
+        showError(message: "Please request a verification code first")
+        return
+    }
+    
+    guard otpCode.count == 6 else {
+        showError(message: "Please enter the 6-digit verification code")
+        return
+    }
+    
+    withAnimation(.easeInOut(duration: 0.6)) {
+        isLoading = true
+        scale = 0.95
+    }
+    
+    // Call the ViewModel's completeLogin method
+    viewModel.completeLogin(email: email, otp: otpCode)
+    
+    // Monitor view model for completion
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        // Check for any errors
+        if !viewModel.errorMessage.isEmpty {
+            showError(message: viewModel.errorMessage)
+            withAnimation {
+                isLoading = false
+                scale = 1.0
+            }
             return
         }
         
-        guard isOTPRequested else {
-            showError(message: "Please request a verification code first")
-            return
-        }
-        
-        guard otpCode.count == 6 else {
-            showError(message: "Please enter the 6-digit verification code")
-            return
-        }
-        
-        // Dismiss keyboard
-        focusedField = nil
-        
-        withAnimation(.easeInOut(duration: 0.6)) {
-            isLoading = true
-            scale = 0.95
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+        // Check for login success
+        if viewModel.userId != nil {
             withAnimation {
                 isLoading = false
                 scale = 1.0
                 
-                if selectedRole == "Admin" && email.lowercased() == "admin@gmail.com" {
+                // Navigate based on user type from the ViewModel
+                if viewModel.userType.lowercased() == "admin" {
                     navigateToAdminDashboard = true
                 } else {
                     navigateToHomePatient = true
                 }
             }
+        } else if !viewModel.isLoading {
+            // Login completed but unsuccessful
+            withAnimation {
+                isLoading = false
+                scale = 1.0
+                showError(message: "Login failed. Please try again.")
+            }
         }
     }
+}
     
     private func showError(message: String) {
         errorMessage = message
@@ -372,14 +407,12 @@ struct Login: View {
         triggerHaptic(style: .heavy)
     }
     
-    // Haptic Feedback
     private func triggerHaptic(style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
         let generator = UIImpactFeedbackGenerator(style: style)
         generator.prepare()
         generator.impactOccurred()
     }
     
-    // Keyboard publisher
     var keyboardPublisher: AnyPublisher<(CGFloat, Bool), Never> {
         Publishers.Merge(
             NotificationCenter.default
@@ -720,25 +753,31 @@ struct LogoHeaderView: View {
 
 struct FormCard: View {
     @Binding var email: String
+    @Binding var password: String
     @Binding var otpCode: String
     @Binding var selectedRole: String
     @Binding var isOTPRequested: Bool
-    var focusedField: Login.Field?
-    var isFocusedEmail: Bool
+    @Binding var isPasswordSubmitted: Bool
     let requestOTP: () -> Void
     let isLoading: Bool
     @Environment(\.colorScheme) var colorScheme
     @State private var cardHover = false
     
+    @FocusState private var isEmailFocused: Bool
+    @FocusState private var isPasswordFocused: Bool
+    @FocusState private var isOTPFocused: Bool
+    
     var body: some View {
         VStack(spacing: 24) {
             roleSelectionSection
             emailFieldSection
+            passwordFieldSection
             otpButtonSection
-            if isOTPRequested {
+            if isOTPRequested && isPasswordSubmitted {
                 OTPTextField(text: $otpCode)
                     .transition(.opacity.combined(with: .move(edge: .top)))
                     .padding(.top, 5)
+                    .focused($isOTPFocused)
             }
         }
         .padding(20)
@@ -771,10 +810,14 @@ struct FormCard: View {
                     lineWidth: 1.5
                 )
         )
-        .onAppear { cardHover = true }
+        .onAppear {
+            cardHover = true
+            // Hardcode initial focus on email field
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isEmailFocused = true
+            }
+        }
     }
-    
-    // MARK: - View Components
     
     private var roleSelectionSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -805,46 +848,29 @@ struct FormCard: View {
     }
     
     private var emailFieldSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Email Address")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(Color(hex: "4A5568"))
-                .padding(.leading, 4)
-            
-            HStack {
-                Image(systemName: "envelope.fill")
-                    .foregroundColor(Color(hex: "4A90E2"))
-                    .font(.system(size: 16))
-                    .padding(.leading, 12)
-                
-                TextField("Enter your email", text: $email)
-                    .keyboardType(.emailAddress)
-                    .textContentType(.emailAddress)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-                    .font(.system(size: 16))
-                    .padding(.vertical, 15)
-            }
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isFocusedEmail ? Color(hex: "4A90E2") : Color.gray.opacity(0.3), lineWidth: 1.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(colorScheme == .dark ? .black : .white).opacity(0.1))
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(hex: "4A90E2").opacity(isFocusedEmail ? 0.3 : 0), lineWidth: 3)
-            )
+        InfoField(title: "Email Address", text: $email)
             .accessibilityLabel("Email address input field")
-        }
+            .onChange(of: email) { newValue in
+                email = newValue.lowercased()
+            }
+    }
+    
+    private var passwordFieldSection: some View {
+        InfoFieldPassword(title: "Password", text: $password)
+            .accessibilityLabel("Password input field")
     }
     
     private var otpButtonSection: some View {
-        Button(action: requestOTP) {
+        Button(action: {
+            requestOTP()
+            if isPasswordSubmitted {
+                isOTPFocused = true // Hardcode focus to OTP field after password submission
+            } else {
+                isPasswordFocused = true // Focus on password if not submitted
+            }
+        }) {
             HStack {
-                Text("Get Verification Code")
+                Text(isPasswordSubmitted ? "Get Verification Code" : "Submit Password")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
                 
@@ -853,7 +879,7 @@ struct FormCard: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(0.8)
                 } else {
-                    Image(systemName: "envelope.badge.fill")
+                    Image(systemName: isPasswordSubmitted ? "envelope.badge.fill" : "lock.fill")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                 }
@@ -874,11 +900,10 @@ struct FormCard: View {
             .disabled(isLoading)
         }
         .buttonStyle(BouncyButtonStyle())
-        .accessibilityLabel("Request verification code button")
-        .accessibilityHint("Sends a verification code to your email")
+        .accessibilityLabel(isPasswordSubmitted ? "Request verification code button" : "Submit password button")
+        .accessibilityHint(isPasswordSubmitted ? "Sends a verification code to your email" : "Submits your password for verification")
     }
     
-    // Haptic Feedback helper
     private func triggerHaptic() {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.prepare()
