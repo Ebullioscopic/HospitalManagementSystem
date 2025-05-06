@@ -41,6 +41,11 @@ struct ProfileView: View {
                         NavigationLink(destination: Text("Change Password")) {
                             ProfileRow(icon: "lock.fill", title: "Change Password")
                         }
+                        
+                        NavigationLink(destination: HealthMetricsView()
+                            .navigationBarBackButtonHidden(false)) {
+                            ProfileRow(icon: "heart.fill", title: "Health Metrics")
+                        }
                     }
                     
                     Divider()
