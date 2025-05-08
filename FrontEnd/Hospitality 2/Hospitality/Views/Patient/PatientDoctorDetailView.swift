@@ -466,6 +466,25 @@ struct PatientDoctorDetailView: View {
                 do {
                     let response = try JSONDecoder().decode(PatientAppointResponse.self, from: data!)
                     print("Appointment booked successfully with ID: \(response.appointment_id)")
+                    NotificationManager.shared.sendBookingConfirmationNotification()
+                    // 1. Combine selectedDate + slot_start_time into full Date
+                    let timeComponents = selectedSlot.slot_start_time.split(separator: ":").compactMap { Int($0) }
+                    if timeComponents.count == 3 {
+                        var dateComponents = Calendar.current.dateComponents([.year, .month, .day], from: selectedDate)
+                        dateComponents.hour = timeComponents[0]
+                        dateComponents.minute = timeComponents[1]
+                        dateComponents.second = timeComponents[2]
+
+                        if let appointmentDateTime = Calendar.current.date(from: dateComponents) {
+                            NotificationManager.shared.scheduleNotification(
+                                appointmentDate: appointmentDateTime,
+                                appointmentTitle: "Appointment with Dr. \(doctor?.staff_name ?? "Hariharan")"
+                            )
+                        } else {
+                            print("❌ Failed to construct appointment datetime.")
+                        }
+                    }
+
                     appointmentSuccess = true
                     showConfirmation = true
                 } catch {
