@@ -176,7 +176,7 @@ struct AdminHomeView: View {
                 }
             }
             .sheet(isPresented: $showProfile) {
-                ProfileView()
+                AdminProfileView()
             }
             .onAppear {
                 // Animate card appearance

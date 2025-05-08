@@ -84,10 +84,20 @@ struct FormCard: View {
         }
     }
     
+    private var EmailFieldSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            InfoFieldEmail(
+                title: "Enter your Email",
+                text: $email,
+                isTyping: isFocusedEmail
+            )
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 24) {
             roleSelectionSection
-            emailFieldSection
+            EmailFieldSection
             passwordFieldSection
             otpButtonSection
             if authViewModel.isOTPSent {
@@ -102,7 +112,7 @@ struct FormCard: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(colorScheme == .dark ? Color(hex: "1E1E1E") : Color.white.opacity(0.3))
+                .fill(colorScheme == .dark ? Color.bg : Color.bg)
                 .shadow(
                     color: colorScheme == .dark ?
                         Color.black.opacity(0.5) :

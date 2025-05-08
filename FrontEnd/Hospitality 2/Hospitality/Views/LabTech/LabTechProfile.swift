@@ -1,19 +1,25 @@
+//
+//  LabTechProfile.swift
+//  Hospitality
+//
+//  Created by admin@33 on 08/05/25.
+//
+
 import SwiftUI
 import UIKit
 
-struct ProfileView: View {
+struct LabTechProfileView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.dismiss) var dismiss
     @State private var showLogoutConfirmation = false
     @State private var isLoading = true
-    @State private var patientData: PatientProfile?
+    @State private var labTechData: LabTechProfile?
     @State private var showImagePicker = false
     @State private var selectedImage: UIImage?
     @State private var isUploadingImage = false
     @State private var showAlert = false
     @State private var alertTitle = ""
     @State private var alertMessage = ""
-    @State private var showEditView = false
     
     // Color palette
     private let primaryColor = Color(hex: "4A90E2")
@@ -57,8 +63,8 @@ struct ProfileView: View {
                             // Profile Card
                             profileDetailsCard
                             
-                            // Health Metrics Card
-                            healthInsightsCard
+                            // Professional Details Card
+                            professionalDetailsCard
                             
                             // Logout Button
                             logoutButton
@@ -68,34 +74,19 @@ struct ProfileView: View {
                         .padding(.bottom, 30)
                     }
                     .refreshable {
-                        fetchPatientProfile()
+                        fetchLabTechProfile()
                     }
                 }
             }
             .navigationTitle("My Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Edit") {
-                        showEditView = true
-                    }
-                    .foregroundColor(primaryColor)
-                    .fontWeight(.medium)
-                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
                     .foregroundColor(primaryColor)
                     .fontWeight(.medium)
-                }
-            }
-            .sheet(isPresented: $showEditView) {
-                if let patient = patientData {
-                    ProfileEditView(patient: patient)
-                        .onDisappear {
-                            fetchPatientProfile()
-                        }
                 }
             }
             .sheet(isPresented: $showImagePicker) {
@@ -122,31 +113,27 @@ struct ProfileView: View {
                 Text("Are you sure you want to log out?")
             }
             .onAppear {
-                fetchPatientProfile()
+                fetchLabTechProfile()
             }
         }
     }
     
     // MARK: - Profile UI Components
+    
     private var profileHeader: some View {
         Button(action: {
             showImagePicker = true
         }) {
             ZStack(alignment: .bottomTrailing) {
-                // Always show the profile placeholder
-                profilePlaceholder
-                
-                // Show the photo if available
-                if let photo = patientData?.profile_photo, !photo.isEmpty,
+                if let photo = labTechData?.profile_photo,
                    let urlString = photo.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-                   let url = URL(string: urlString) {
+                   let url = URL(string: urlString),
+                   !photo.isEmpty {
                     
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .empty:
-                            // Show progress view while loading over the placeholder
-                            ProgressView()
-                                .frame(width: 120, height: 120)
+                            profilePlaceholder
                         case .success(let image):
                             image
                                 .resizable()
@@ -159,19 +146,15 @@ struct ProfileView: View {
                                         .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                                 )
                         case .failure:
-                            // Optionally show an error indicator, placeholder remains underneath
-                            Image(systemName: "exclamationmark.triangle")
-                                .foregroundColor(.red)
-                                .frame(width: 120, height: 120)
-                                .background(Color.white.opacity(0.7))
-                                .clipShape(Circle())
+                            profilePlaceholder
                         @unknown default:
-                            EmptyView()
+                            profilePlaceholder
                         }
                     }
+                } else {
+                    profilePlaceholder
                 }
                 
-                // Upload progress overlay
                 if isUploadingImage {
                     ProgressView()
                         .tint(.white)
@@ -204,11 +187,11 @@ struct ProfileView: View {
             // Name and Email
             HStack {
                 VStack(alignment: .center, spacing: 4) {
-                    Text(patientData?.patient_name ?? "Name")
+                    Text(labTechData?.staff_name ?? "Name")
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(colorScheme == .dark ? .white : Color(hex: "2C3E50"))
                     
-                    Text(patientData?.patient_email ?? "Email")
+                    Text(labTechData?.staff_email ?? "Email")
                         .font(.system(size: 16))
                         .foregroundColor(.secondary)
                 }
@@ -223,24 +206,24 @@ struct ProfileView: View {
             // Quick Info Pills
             HStack(spacing: 12) {
                 InfoPill(
-                    title: "Blood",
-                    value: patientData?.patient_blood_group ?? "N/A",
-                    icon: "drop.fill",
-                    color: dangerColor
-                )
-                
-                InfoPill(
-                    title: "Gender",
-                    value: patientData?.patient_gender == true ? "Male" : "Female",
-                    icon: "person.fill",
+                    title: "ID",
+                    value: labTechData?.staff_id ?? "N/A",
+                    icon: "number",
                     color: primaryColor
                 )
                 
                 InfoPill(
-                    title: "ID",
-                    value: "#\(patientData?.patient_id ?? 0)",
-                    icon: "number",
+                    title: "Role",
+                    value: labTechData?.role.role_name ?? "N/A",
+                    icon: "person.fill",
                     color: successColor
+                )
+                
+                InfoPill(
+                    title: "Status",
+                    value: labTechData?.on_leave == true ? "On Leave" : "Active",
+                    icon: "circle.fill",
+                    color: labTechData?.on_leave == true ? warningColor : successColor
                 )
             }
             .padding(.vertical, 20)
@@ -250,9 +233,9 @@ struct ProfileView: View {
             
             // Additional Details
             VStack(alignment: .leading, spacing: 16) {
-                DetailRow(icon: "calendar", label: "Date of Birth", value: formatDate(patientData?.patient_dob ?? ""))
-                DetailRow(icon: "phone.fill", label: "Mobile", value: patientData?.patient_mobile ?? "Not provided")
-                DetailRow(icon: "mappin.and.ellipse", label: "Address", value: patientData?.patient_address ?? "Not provided")
+                DetailRow(icon: "calendar", label: "Date of Birth", value: formatDate(labTechData?.staff_dob))
+                DetailRow(icon: "phone.fill", label: "Mobile", value: labTechData?.staff_mobile ?? "Not provided")
+                DetailRow(icon: "mappin.and.ellipse", label: "Address", value: labTechData?.staff_address ?? "Not provided")
             }
             .padding(.vertical, 20)
             .padding(.horizontal, 24)
@@ -264,56 +247,45 @@ struct ProfileView: View {
         )
     }
 
-    private var healthInsightsCard: some View {
-        NavigationLink(destination: HealthMetricsView().navigationBarBackButtonHidden(false)) {
-            VStack(spacing: 0) {
-                // Header
-                HStack {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Image(systemName: "heart.text.square.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(.white)
-                            
-                            Text("Health Insights")
-                                .font(.system(size: 22, weight: .bold))
-                                .foregroundColor(.white)
-                        }
+    private var professionalDetailsCard: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Image(systemName: "testtube.2")
+                            .font(.system(size: 24))
+                            .foregroundColor(primaryColor)
                         
-                        Text("View your health metrics and vitals")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white.opacity(0.9))
+                        Text("Professional Details")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(colorScheme == .dark ? .white : Color(hex: "2C3E50"))
                     }
                     
-                    Spacer()
-                    
-                    Circle()
-                        .fill(Color.white.opacity(0.2))
-                        .frame(width: 36, height: 36)
-                        .overlay(
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
-                        )
+                    Text("Lab technician information")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 16)
+                
+                Spacer()
             }
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        primaryColor,
-                        secondaryColor,
-                        Color(hex: "6A6AE2")
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .shadow(color: primaryColor.opacity(0.4), radius: 15, x: 0, y: 8)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+            
+            // Professional Details
+            VStack(alignment: .leading, spacing: 16) {
+                DetailRow(icon: "graduationcap.fill", label: "Qualification", value: labTechData?.staff_qualification ?? "Not provided")
+                DetailRow(icon: "calendar.badge.plus", label: "Joined On", value: formatDate(labTechData?.created_at))
+            }
+            .padding(.vertical, 20)
+            .padding(.horizontal, 24)
         }
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.08), radius: 15, x: 0, y: 5)
+        )
     }
     
     private var logoutButton: some View {
@@ -368,71 +340,10 @@ struct ProfileView: View {
         }
     }
 
-    struct MetricCard: View {
-        let icon: String
-        let title: String
-        let value: String
-        let unit: String
-        let trend: String
-        let trendUp: Bool?
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: icon)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
-                    
-                    Text(title)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white)
-                    
-                    Spacer()
-                }
-                
-                HStack(alignment: .firstTextBaseline) {
-                    Text(value)
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Text(unit)
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.8))
-                        .padding(.leading, -2)
-                    
-                    Spacer()
-                    
-                    Text(trend)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(trendColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(trendColor.opacity(0.2))
-                        )
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.15))
-            )
-            .frame(maxWidth: .infinity)
-        }
-        
-        private var trendColor: Color {
-            guard let up = trendUp else {
-                return .white
-            }
-            return up ? Color(hex: "4ADE80") : Color(hex: "F87171")
-        }
-    }
-
     struct DetailRow: View {
         let icon: String
         let label: String
-        let value: String
+        let value: String?
 
         var body: some View {
             HStack(spacing: 16) {
@@ -446,7 +357,7 @@ struct ProfileView: View {
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
                     
-                    Text(value)
+                    Text(value ?? "Not provided")
                         .font(.system(size: 16))
                         .foregroundColor(.primary)
                 }
@@ -458,10 +369,10 @@ struct ProfileView: View {
 
     // MARK: - Functions
 
-    private func fetchPatientProfile() {
+    private func fetchLabTechProfile() {
         isLoading = true
         
-        guard let url = URL(string: "\(Constants.baseURL)/accounts/patient/profile/") else {
+        guard let url = URL(string: "\(Constants.baseURL)/hospital/staff/profile/") else {
             isLoading = false
             showAlert(title: "Error", message: "Invalid URL")
             return
@@ -488,12 +399,10 @@ struct ProfileView: View {
                     return
                 }
                 
-                
                 do {
                     let decoder = JSONDecoder()
-                    let profile = try decoder.decode(PatientProfile.self, from: data)
-                    print("Profile: \(profile)")
-                    self.patientData = profile
+                    let profile = try decoder.decode(LabTechProfile.self, from: data)
+                    self.labTechData = profile
                 } catch {
                     showAlert(title: "Parsing Error", message: "Could not parse profile data: \(error.localizedDescription)")
                 }
@@ -509,8 +418,7 @@ struct ProfileView: View {
         
         isUploadingImage = true
         
-        // Ensure the URL matches the API endpoint
-        guard let url = URL(string: "\(Constants.baseURL)/accounts/patient/update-photo/") else {
+        guard let url = URL(string: "\(Constants.baseURL)/hospital/staff/update-photo/") else {
             isUploadingImage = false
             showAlert(title: "Error", message: "Invalid URL")
             return
@@ -563,13 +471,14 @@ struct ProfileView: View {
                 
                 if httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 {
                     self.showAlert(title: "Success", message: "Profile photo updated successfully")
-                    self.fetchPatientProfile()
+                    self.fetchLabTechProfile()
                 } else {
                     self.showAlert(title: "Upload Failed", message: "Server returned status code: \(httpResponse.statusCode)")
                 }
             }
         }.resume()
     }
+    
     private func logout() {
         UserDefaults.clearAuthData()
         let generator = UINotificationFeedbackGenerator()
@@ -584,7 +493,11 @@ struct ProfileView: View {
         self.showAlert = true
     }
 
-    private func formatDate(_ dateString: String) -> String {
+    private func formatDate(_ dateString: String?) -> String {
+        guard let dateString = dateString else {
+            return "Not provided"
+        }
+        
         let inputFormatter = DateFormatter()
         inputFormatter.dateFormat = "yyyy-MM-dd"
         
@@ -598,51 +511,26 @@ struct ProfileView: View {
     }
 }
 
-// MARK: - Models and Extensions
-struct PatientProfile: Codable {
-    let patient_id: Int
-    let patient_name: String
-    let patient_email: String
-    let patient_mobile: String?
-    let patient_remark: String?
-    let patient_dob: String
-    let patient_gender: Bool
-    let patient_blood_group: String
-    let patient_address: String?
+// MARK: - Models
+struct LabTechProfile: Codable {
+    let staff_id: String?
+    let staff_name: String?
+    let staff_email: String?
+    let staff_mobile: String?
+    let role: StaffRole
+    let created_at: String?
+    let on_leave: Bool?
+    let staff_dob: String?
+    let staff_address: String?
+    let staff_qualification: String?
     let profile_photo: String?
 }
 
-extension Notification.Name {
-    static let logout = Notification.Name("logout")
-}
-
-struct PatientProfileMenuItem: View {
-    let icon: String
-    let title: String
-    @Environment(\.colorScheme) var colorScheme
-    
-    var body: some View {
-        HStack(spacing: 15) {
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(Color(hex: "4A90E2"))
-                .frame(width: 24)
-            
-            Text(title)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(colorScheme == .dark ? .white : Color(hex: "2C5282"))
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color.gray.opacity(0.7))
-        }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 16)
-    }
+struct StaffRole: Codable {
+    let role_id: Int
+    let role_name: String
 }
 
 #Preview {
-    ProfileView()
+    LabTechProfileView()
 }

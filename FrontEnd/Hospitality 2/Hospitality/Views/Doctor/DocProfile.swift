@@ -2,331 +2,544 @@
 //  DocProfile.swift
 //  Hospitality
 //
-//  Created by admin@33 on 28/04/25.
 //
 
 import SwiftUI
 import UIKit
 
-struct DocProfile: View {
+struct DoctorProfileView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.dismiss) var dismiss
     @State private var showLogoutConfirmation = false
+    @State private var isLoading = true
+    @State private var doctorData: DoctorProfile?
+    @State private var showImagePicker = false
+    @State private var selectedImage: UIImage?
+    @State private var isUploadingImage = false
+    @State private var showAlert = false
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
+    @State private var showEditView = false
     
-    // Doctor data
-    private let doctorName = UserDefaults.email
-    private let doctorSpecialty = "Cardiology"
-    private let staffID = "DOC-12345"
-    
-    // Shift selection state
-    @State private var selectedDate = Date()
-    @State private var selectedSlots: Set<Int> = []
-    @State private var isSubmitting = false
-    @State private var showSuccessAlert = false
-    @State private var showErrorAlert = false
-    @State private var errorMessage = ""
-    
-    let availableSlots = [
-        (id: 1, name: "Morning (6AM-12PM)"),
-        (id: 2, name: "Afternoon (12PM-6PM)"),
-        (id: 3, name: "Evening (6PM-12AM)"),
-        (id: 4, name: "Night (12AM-6AM)")
-    ]
-    
+    // Color palette
+    private let primaryColor = Color(hex: "4A90E2")
+    private let secondaryColor = Color(hex: "5B86E5")
+    private let accentColor = Color(hex: "3BD1D3")
+    private let dangerColor = Color(hex: "E53E3E")
+    private let successColor = Color(hex: "38A169")
+    private let warningColor = Color(hex: "F6AD55")
+    private let backgroundGradient = LinearGradient(
+        gradient: Gradient(colors: [
+            Color(hex: "EEF6FF"),
+            Color(hex: "F8FAFF")
+        ]),
+        startPoint: .top,
+        endPoint: .bottom
+    )
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    profileHeader
-                    accountSection
-                    settingsSection
-                    logoutButton
+            ZStack {
+                backgroundGradient
+                    .ignoresSafeArea()
+
+                if isLoading {
+                    VStack {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(primaryColor)
+                        Text("Loading profile...")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .padding(.top, 10)
+                    }
+                } else {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 22) {
+                            // Profile Header
+                            profileHeader
+                                .padding(.top, 10)
+                            
+                            // Profile Card
+                            profileDetailsCard
+                            
+                            // Professional Details Card
+                            professionalDetailsCard
+                            
+                            // Logout Button
+                            logoutButton
+                                .padding(.vertical, 10)
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 30)
+                    }
+                    .refreshable {
+                        fetchDoctorProfile()
+                    }
                 }
-                .padding()
             }
-            .navigationTitle("Doctor Profile")
+            .navigationTitle("My Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(primaryColor)
+                    .fontWeight(.medium)
                 }
             }
-            // Add alerts directly using .alert(isPresented:content:)
+            .sheet(isPresented: $showImagePicker) {
+                ImagePicker(selectedImage: $selectedImage)
+                    .onDisappear {
+                        if selectedImage != nil {
+                            uploadProfilePhoto()
+                        }
+                    }
+            }
+            .alert(isPresented: $showAlert) {
+                Alert(
+                    title: Text(alertTitle),
+                    message: Text(alertMessage),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
             .alert("Log Out", isPresented: $showLogoutConfirmation) {
                 Button("Cancel", role: .cancel) {}
-                Button("Log Out", role: .destructive) { logout() }
+                Button("Log Out", role: .destructive) {
+                    logout()
+                }
             } message: {
                 Text("Are you sure you want to log out?")
             }
-            .alert("Success", isPresented: $showSuccessAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("Your availability has been successfully submitted.")
-            }
-            .alert("Error", isPresented: $showErrorAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage)
+            .onAppear {
+                fetchDoctorProfile()
             }
         }
     }
     
-    // MARK: - Subviews
+    // MARK: - Profile UI Components
     
     private var profileHeader: some View {
-        VStack {
-            Image(systemName: "person.circle.fill")
-                .font(.system(size: 80))
-                .foregroundColor(Color(hex: "4A90E2"))
-                .padding(.bottom, 10)
-            
-            Text(doctorName)
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            Text("Doctor")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-            
-            Text(doctorSpecialty)
-                .font(.subheadline)
-                .foregroundColor(.gray)
-                .padding(.top, 2)
-            
-            Text("Staff ID: \(staffID)")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-                .padding(.top, 2)
-        }
-        .padding(.vertical, 30)
-    }
-    
-    private var shiftSelectionSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text("SELECT AVAILABILITY")
-                .font(.caption)
-                .foregroundColor(.gray)
-                .padding(.horizontal)
-            
-            datePicker
-            
-            Text("Available Slots")
-                .font(.headline)
-                .padding(.horizontal)
-            
-            ForEach(availableSlots, id: \.id) { slot in
-                slotToggle(slot: slot)
-            }
-            
-            submitButton
-        }
-        .padding(.vertical)
-    }
-    
-    private var datePicker: some View {
-        DatePicker("Select Date", selection: $selectedDate, displayedComponents: .date)
-            .datePickerStyle(.graphical)
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemBackground))
-            )
-            .shadow(radius: 2)
-    }
-    
-    private func slotToggle(slot: (id: Int, name: String)) -> some View {
-        HStack {
-            Toggle(isOn: Binding(
-                get: { selectedSlots.contains(slot.id) },
-                set: { isSelected in
-                    if isSelected {
-                        selectedSlots.insert(slot.id)
-                    } else {
-                        selectedSlots.remove(slot.id)
+        Button(action: {
+            showImagePicker = true
+        }) {
+            ZStack(alignment: .bottomTrailing) {
+                if let photo = doctorData?.profile_photo,
+                   let urlString = photo.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                   let url = URL(string: urlString),
+                   !photo.isEmpty {
+                    
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            profilePlaceholder
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 120, height: 120)
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 4)
+                                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                                )
+                        case .failure:
+                            profilePlaceholder
+                        @unknown default:
+                            profilePlaceholder
+                        }
                     }
+                } else {
+                    profilePlaceholder
                 }
-            )) {
-                Text(slot.name)
-                    .font(.subheadline)
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemBackground)))
-    }
-    
-    private var submitButton: some View {
-        Button(action: submitShifts) {
-            HStack {
-                if isSubmitting {
+                
+                if isUploadingImage {
                     ProgressView()
                         .tint(.white)
-                } else {
-                    Image(systemName: "calendar.badge.plus")
+                        .frame(width: 120, height: 120)
+                        .background(Color.black.opacity(0.3))
+                        .clipShape(Circle())
                 }
-                Text("Submit Availability")
-            }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.blue)
-            .foregroundColor(.white)
-            .cornerRadius(10)
-        }
-        .padding(.horizontal)
-        .disabled(isSubmitting || selectedSlots.isEmpty)
-        .opacity(isSubmitting || selectedSlots.isEmpty ? 0.6 : 1)
-    }
-    
-    private var accountSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text("ACCOUNT")
-                .font(.caption)
-                .foregroundColor(.gray)
-                .padding(.horizontal)
-            
-            NavigationLink(destination: Text("Edit Profile")) {
-                ProfileRow(icon: "person.fill", title: "Edit Profile")
-            }
-            
-            NavigationLink(destination: Text("Change Password")) {
-                ProfileRow(icon: "lock.fill", title: "Change Password")
             }
         }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, 10)
     }
     
-    private var settingsSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
+    private var profilePlaceholder: some View {
+        Image(systemName: "person.circle.fill")
+            .font(.system(size: 80))
+            .foregroundColor(primaryColor.opacity(0.8))
+            .frame(width: 120, height: 120)
+            .background(Color.white.opacity(0.7))
+            .clipShape(Circle())
+            .overlay(
+                Circle()
+                    .stroke(Color.white, lineWidth: 4)
+                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+            )
+    }
+
+    private var profileDetailsCard: some View {
+        VStack(spacing: 0) {
+            // Name and Email
+            HStack {
+                VStack(alignment: .center, spacing: 4) {
+                    Text(doctorData?.staff_name ?? "Name")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(colorScheme == .dark ? .white : Color(hex: "2C3E50"))
+                    
+                    Text(doctorData?.staff_email ?? "Email")
+                        .font(.system(size: 16))
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 24)
+                .padding(.bottom, 16)
+            }
+            
             Divider()
-                .padding(.vertical, 10)
+                .padding(.horizontal, 20)
             
-            Text("SETTINGS")
-                .font(.caption)
-                .foregroundColor(.gray)
-                .padding(.horizontal)
-            
-            NavigationLink(destination: Text("Notifications")) {
-                ProfileRow(icon: "bell.fill", title: "Notifications")
+            // Quick Info Pills
+            HStack(spacing: 12) {
+                InfoPill(
+                    title: "ID",
+                    value: doctorData?.staff_id ?? "N/A",
+                    icon: "number",
+                    color: primaryColor
+                )
+                
+                InfoPill(
+                    title: "Role",
+                    value: doctorData?.role.role_name ?? "N/A",
+                    icon: "person.fill",
+                    color: successColor
+                )
+                
+                InfoPill(
+                    title: "Status",
+                    value: doctorData?.on_leave == true ? "On Leave" : "Active",
+                    icon: "circle.fill",
+                    color: doctorData?.on_leave == true ? warningColor : successColor
+                )
             }
+            .padding(.vertical, 20)
             
-            NavigationLink(destination: Text("Privacy")) {
-                ProfileRow(icon: "hand.raised.fill", title: "Privacy")
+            Divider()
+                .padding(.horizontal, 20)
+            
+            // Additional Details
+            VStack(alignment: .leading, spacing: 16) {
+                DetailRow(icon: "calendar", label: "Date of Birth", value: formatDate(doctorData?.staff_dob ?? ""))
+                DetailRow(icon: "phone.fill", label: "Mobile", value: doctorData?.staff_mobile ?? "Not provided")
+                DetailRow(icon: "mappin.and.ellipse", label: "Address", value: doctorData?.staff_address ?? "Not provided")
             }
+            .padding(.vertical, 20)
+            .padding(.horizontal, 24)
         }
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.08), radius: 15, x: 0, y: 5)
+        )
+    }
+
+    private var professionalDetailsCard: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Image(systemName: "stethoscope")
+                            .font(.system(size: 24))
+                            .foregroundColor(primaryColor)
+                        
+                        Text("Professional Details")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(colorScheme == .dark ? .white : Color(hex: "2C3E50"))
+                    }
+                    
+                    Text("Doctor's professional information")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+            
+            // Professional Details
+            VStack(alignment: .leading, spacing: 16) {
+                DetailRow(icon: "graduationcap.fill", label: "Qualification", value: doctorData?.staff_qualification ?? "Not provided")
+                DetailRow(icon: "cross.case.fill", label: "Specialization", value: doctorData?.doctor_specialization ?? "Not provided")
+                DetailRow(icon: "doc.text.fill", label: "License", value: doctorData?.doctor_license ?? "Not provided")
+                DetailRow(icon: "clock.fill", label: "Experience", value: "\(doctorData?.doctor_experience_years ?? 0) years")
+                DetailRow(icon: "person.fill", label: "Doctor Type", value: doctorData?.doctor_type.doctor_type ?? "Not provided")
+                DetailRow(icon: "calendar.badge.plus", label: "Joined On", value: formatDate(doctorData?.created_at ?? ""))
+            }
+            .padding(.vertical, 20)
+            .padding(.horizontal, 24)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.08), radius: 15, x: 0, y: 5)
+        )
     }
     
     private var logoutButton: some View {
-        Button(action: { showLogoutConfirmation = true }) {
+        Button(action: {
+            showLogoutConfirmation = true
+        }) {
             HStack {
-                Image(systemName: "arrow.left.square.fill")
-                    .foregroundColor(.red)
+                Spacer()
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .font(.system(size: 16, weight: .medium))
                 Text("Log Out")
-                    .foregroundColor(.red)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 16, weight: .medium))
+                Spacer()
             }
-            .frame(maxWidth: .infinity)
-            .padding()
+            .padding(.vertical, 16)
+            .foregroundColor(dangerColor)
             .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.red.opacity(0.1))
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(dangerColor.opacity(0.1))
             )
         }
-        .padding(.top, 30)
-        .padding(.horizontal)
     }
-    
-    // MARK: - Helper Functions
-    
-    private func submitShifts() {
-        guard !selectedSlots.isEmpty else { return }
+
+    // MARK: - Supporting Views
+
+    struct InfoPill: View {
+        let title: String
+        let value: String
+        let icon: String
+        let color: Color
+
+        var body: some View {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(color)
+                    .frame(width: 40, height: 40)
+                    .background(
+                        Circle()
+                            .fill(color.opacity(0.12))
+                    )
+                
+                Text(value)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Text(title)
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    struct DetailRow: View {
+        let icon: String
+        let label: String
+        let value: String
+
+        var body: some View {
+            HStack(spacing: 16) {
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(Color(hex: "4A90E2"))
+                    .frame(width: 20)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                    
+                    Text(value)
+                        .font(.system(size: 16))
+                        .foregroundColor(.primary)
+                }
+                
+                Spacer()
+            }
+        }
+    }
+
+    // MARK: - Functions
+
+    private func fetchDoctorProfile() {
+        isLoading = true
         
-        isSubmitting = true
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let dateString = formatter.string(from: selectedDate)
-        
-        let requests = selectedSlots.map { slotId in
-            DoctorShiftRequest(shift_id: slotId, date: dateString)
+        guard let url = URL(string: "\(Constants.baseURL)/hospital/staff/profile/") else {
+            isLoading = false
+            showAlert(title: "Error", message: "Invalid URL")
+            return
         }
         
-        let doctorId = UserDefaults.userId
-        let group = DispatchGroup()
-        var success = true
-        var errorMsg = ""
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
         
-        for request in requests {
-            group.enter()
-            
-            guard let url = URL(string: "\(Constants.baseURL)/hospital/general/doctors/\(doctorId)/shifts/") else {
-                errorMsg = "Invalid URL"
-                success = false
-                group.leave()
-                return
-            }
-            
-            var urlRequest = URLRequest(url: url)
-            urlRequest.httpMethod = "POST"
-            urlRequest.addValue("application/json", forHTTPHeaderField: "Content-Type")
-            urlRequest.addValue("Bearer \(UserDefaults.accessToken)", forHTTPHeaderField: "Authorization")
-            
-            do {
-                urlRequest.httpBody = try JSONEncoder().encode(request)
-            } catch {
-                errorMsg = "Failed to encode request"
-                success = false
-                group.leave()
-                return
-            }
-            
-            URLSession.shared.dataTask(with: urlRequest) { data, response, error in
-                defer { group.leave() }
+        if !UserDefaults.accessToken.isEmpty {
+            request.addValue("Bearer \(UserDefaults.accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                isLoading = false
                 
                 if let error = error {
-                    errorMsg = error.localizedDescription
-                    success = false
+                    showAlert(title: "Network Error", message: error.localizedDescription)
+                    return
+                }
+                
+                guard let data = data else {
+                    showAlert(title: "Error", message: "No data received")
+                    return
+                }
+                
+                do {
+                    let decoder = JSONDecoder()
+                    let profile = try decoder.decode(DoctorProfile.self, from: data)
+                    self.doctorData = profile
+                } catch {
+                    showAlert(title: "Parsing Error", message: "Could not parse profile data: \(error.localizedDescription)")
+                }
+            }
+        }.resume()
+    }
+
+    private func uploadProfilePhoto() {
+        guard let image = selectedImage else {
+            showAlert(title: "Error", message: "No image selected")
+            return
+        }
+        
+        isUploadingImage = true
+        
+        guard let url = URL(string: "\(Constants.baseURL)/hospital/staff/update-photo/") else {
+            isUploadingImage = false
+            showAlert(title: "Error", message: "Invalid URL")
+            return
+        }
+        
+        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
+            isUploadingImage = false
+            showAlert(title: "Error", message: "Could not process image")
+            return
+        }
+        
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        if !UserDefaults.accessToken.isEmpty {
+            request.addValue("Bearer \(UserDefaults.accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"profile_photo\"; filename=\"profile.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                self.isUploadingImage = false
+                
+                if let error = error {
+                    print("Upload error: \(error.localizedDescription)")
+                    self.showAlert(title: "Upload Error", message: error.localizedDescription)
                     return
                 }
                 
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    errorMsg = "Invalid server response"
-                    success = false
+                    print("Invalid response")
+                    self.showAlert(title: "Upload Failed", message: "Invalid response from server")
                     return
                 }
                 
-                if !(200...299).contains(httpResponse.statusCode) {
-                    if let data = data, let errorResponse = try? JSONDecoder().decode([String: String].self, from: data) {
-                        errorMsg = errorResponse["message"] ?? "Unknown error occurred"
-                    } else {
-                        errorMsg = "Server returned status code \(httpResponse.statusCode)"
-                    }
-                    success = false
+                print("Status code: \(httpResponse.statusCode)")
+                if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                    print("Response data: \(responseString)")
                 }
-            }.resume()
-        }
-        
-        group.notify(queue: .main) {
-            isSubmitting = false
-            
-            if success {
-                showSuccessAlert = true
-                selectedSlots.removeAll()
-            } else {
-                errorMessage = errorMsg
-                showErrorAlert = true
+                
+                if httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 {
+                    self.showAlert(title: "Success", message: "Profile photo updated successfully")
+                    self.fetchDoctorProfile()
+                } else {
+                    self.showAlert(title: "Upload Failed", message: "Server returned status code: \(httpResponse.statusCode)")
+                }
             }
-        }
+        }.resume()
     }
     
     private func logout() {
         UserDefaults.clearAuthData()
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
         dismiss()
         NotificationCenter.default.post(name: .logout, object: nil)
     }
+
+    private func showAlert(title: String, message: String) {
+        self.alertTitle = title
+        self.alertMessage = message
+        self.showAlert = true
+    }
+
+    private func formatDate(_ dateString: String) -> String {
+        let inputFormatter = DateFormatter()
+        inputFormatter.dateFormat = "yyyy-MM-dd"
+        
+        guard let date = inputFormatter.date(from: dateString) else {
+            return dateString
+        }
+        
+        let outputFormatter = DateFormatter()
+        outputFormatter.dateFormat = "MMM d, yyyy"
+        return outputFormatter.string(from: date)
+    }
+}
+
+// MARK: - Models
+struct DoctorProfile: Codable {
+    let staff_id: String
+    let staff_name: String
+    let staff_email: String
+    let staff_mobile: String?
+    let role: RoleDoc
+    let created_at: String
+    let on_leave: Bool
+    let staff_dob: String
+    let staff_address: String?
+    let staff_qualification: String?
+    let profile_photo: String?
+    let doctor_specialization: String?
+    let doctor_license: String?
+    let doctor_experience_years: Int?
+    let doctor_type: DoctorTypeDoc
+}
+
+struct RoleDoc: Codable {
+    let role_id: Int
+    let role_name: String
+}
+
+struct DoctorTypeDoc: Codable {
+    let doctor_type_id: Int
+    let doctor_type: String
 }
 
 #Preview {
-    DocProfile()
-        .preferredColorScheme(.dark)
+    DoctorProfileView()
 }

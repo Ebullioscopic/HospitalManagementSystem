@@ -217,6 +217,7 @@ struct LabTechnicianDetails: Identifiable, Codable {
     let id: String
     let staffId: String
     let certificationId: String
+    let staffMobile: String
     let labExperienceYears: Int
     let assignedLabId: String
 }
@@ -414,6 +415,7 @@ class MockHospitalDataStore: ObservableObject {
                                     id: UUID().uuidString,
                                     staffId: tech.staff_id,
                                     certificationId: tech.certification,
+                                    staffMobile: tech.staff_mobile,
                                     labExperienceYears: tech.lab_experience_years,
                                     assignedLabId: tech.assigned_lab
                                 )
@@ -493,11 +495,26 @@ class MockHospitalDataStore: ObservableObject {
         }
     
     func createLabTechnician(staff: LabStaff, techDetails: LabTechnicianDetails) {
-        if !labStaff.contains(where: { $0.id == staff.id }) {
-            self.labStaff.append(staff)
-            self.labTechnicians.append(techDetails)
+            labTechnicianService.createLabTechnician(
+                name: staff.staffName,
+                email: staff.staffEmail,
+                mobile: techDetails.staffMobile ?? "",
+                certification: techDetails.certificationId,
+                experienceYears: techDetails.labExperienceYears,
+                assignedLab: techDetails.assignedLabId,
+                joiningDate: Date()
+            ) { [weak self] result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let response):
+                        print("Created lab technician: \(response.message)")
+                        self?.fetchStaff() // Refresh the list
+                    case .failure(let error):
+                        print("Failed to create lab technician: \(error)")
+                    }
+                }
+            }
         }
-    }
     
     // Lab Test CRUD
     func fetchLabTestTypes() {

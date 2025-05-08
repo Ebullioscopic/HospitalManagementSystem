@@ -21,6 +21,9 @@ struct Register: View {
     @State private var navigateToLogin = false
     @State private var isPasswordVisible = false
     @State private var isConfirmPasswordVisible = false
+    var isFocusedName: Bool
+    var isFocusedEmail: Bool
+    var isFocusedNumber: Bool
     @FocusState private var focusedField: Field?
     @Environment(\.dismiss) var dismiss
     
@@ -124,12 +127,12 @@ struct Register: View {
     @ViewBuilder
     private func Step1Form() -> some View {
         VStack(spacing: 24) {
-            InfoField(title: "Full Name", text: $name)
+            InfoFieldName(title: "Full Name", text: $name, isTyping: isFocusedName)
                 .focused($focusedField, equals: .name)
                 .textContentType(.name)
                 .submitLabel(.next)
             
-            InfoField(title: "Phone Number", text: $phone)
+            InfoFieldPhone(title: "Phone Number", text: $phone, isTyping: isFocusedNumber)
                 .focused($focusedField, equals: .phone)
                 .keyboardType(.numberPad)
                 .onChange(of: phone) { newValue in
@@ -140,7 +143,7 @@ struct Register: View {
                 }
                 .submitLabel(.next)
             
-            InfoField(title: "Email Address", text: $email)
+            InfoFieldEmail(title: "Email Address", text: $email, isTyping: isFocusedEmail)
                 .focused($focusedField, equals: .email)
                 .onChange(of: email) { newValue in
                     email = newValue.lowercased()
@@ -195,6 +198,7 @@ struct Register: View {
                 .padding(.leading, 4)
             }
         }
+        .background(Color.bg)
     }
     
     @ViewBuilder
@@ -231,7 +235,7 @@ struct Register: View {
                     .frame(width: 150)
             }
             .padding(12)
-            .background(Color.gray.opacity(0.05))
+            .background(Color.bg)
             .cornerRadius(12)
             
             // Gender
@@ -255,7 +259,7 @@ struct Register: View {
                 )
             }
             .padding(12)
-            .background(Color.gray.opacity(0.05))
+            .background(Color.bg)
             .cornerRadius(12)
             
             // Blood Group
@@ -270,7 +274,7 @@ struct Register: View {
                     .frame(width: 150)
             }
             .padding(12)
-            .background(Color.gray.opacity(0.05))
+            .background(Color.bg)
             .cornerRadius(12)
         }
         .padding(.horizontal, 16)
@@ -737,22 +741,6 @@ struct GenderSelector: View {
         case "Male": return "mustache.fill"
         case "Female": return "eyelashes.fill"
         default: return "person.fill.questionmark"
-        }
-    }
-}
-
-struct Register_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            NavigationStack {
-                Register()
-            }
-            .preferredColorScheme(.light)
-            
-            NavigationStack {
-                Register()
-            }
-            .preferredColorScheme(.dark)
         }
     }
 }

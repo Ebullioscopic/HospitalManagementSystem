@@ -202,7 +202,11 @@ struct Login: View {
             UserDefaults.email = email
             UserDefaults.staffSubRole = staffSubRole
             UserDefaults.hasCompletedOnboarding = false
-            UserDefaults.standard.synchronize()
+            
+            // Store staff_id for all staff types (admin, doctor, lab tech)
+            if response.user_type == "admin" || response.user_type == "staff" {
+                UserDefaults.standard.set(response.user_id, forKey: "staff_id")
+            }
             
             // Force synchronize
             UserDefaults.standard.synchronize()
@@ -216,6 +220,8 @@ struct Login: View {
                     if staffSubRole == "doctor" {
                         navigationPath.append(AppRoute.doctorOnboarding(staffId: response.user_id))
                     } else {
+                        // For lab technicians
+                        UserDefaults.standard.set(response.user_id, forKey: "staff_id")
                         navigationPath.append(AppRoute.labTechOnboarding)
                     }
                 case "patient":

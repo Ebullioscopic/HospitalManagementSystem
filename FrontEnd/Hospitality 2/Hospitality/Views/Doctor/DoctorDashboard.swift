@@ -47,7 +47,7 @@ struct DoctorDashboardView: View {
                                     .foregroundColor(.blue)
                             }
                             .sheet(isPresented: $showProfileDetail) {
-                                DocProfile()
+                                DoctorProfileView()
                             }
                         }
                         .padding(.horizontal)

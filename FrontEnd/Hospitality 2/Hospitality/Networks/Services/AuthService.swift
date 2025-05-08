@@ -310,7 +310,7 @@ struct CreateLabResponse: Codable {
     let functional: Bool
 }
 
-struct AppointmentListResponse: Codable, Identifiable {
+struct AppointmentListResponsefetch: Codable, Identifiable {
     let id: Int // Conform to Identifiable
     let patient: Int
     let patient_name: String
@@ -321,7 +321,7 @@ struct AppointmentListResponse: Codable, Identifiable {
     let created_at: String
     let status: String
     let reason: String
-    let lab_tests: [LabTestResponse]
+    let lab_tests: [LabTestResponsefetch]
     
     // Custom CodingKeys to map 'id' to 'appointment_id' in JSON
     enum CodingKeys: String, CodingKey {
@@ -339,16 +339,16 @@ struct AppointmentListResponse: Codable, Identifiable {
     }
 }
 
-struct LabTestResponse: Codable {
+struct LabTestResponsefetch: Codable {
     let lab_test_id: Int
     let test_type: String
     let test_datetime: String
     let priority: String
-    let test_result: TestResultResponse?
+    let test_result: TestResultResponsefetch?
     let is_paid: Bool
 }
 
-struct TestResultResponse: Codable {
+struct TestResultResponsefetch: Codable {
     let notes: String?
     let platelets: Int?
     let rbc_count: Double?

@@ -102,11 +102,12 @@ struct OTPTextField: View {
     }
 }
 
-// MARK: - InfoField Components
-struct InfoField : View {
+struct InfoFieldName: View {
     let title: String
     @Binding var text: String
-    @FocusState var isTyping: Bool
+    var isTyping: Bool
+    @State private var isValidName: Bool = true
+    @FocusState private var isFocused: Bool
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
@@ -114,33 +115,158 @@ struct InfoField : View {
             TextField("", text: $text)
                 .padding(.leading)
                 .frame(height: 55)
-                .focused($isTyping)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(isTyping ? Color(hex: "4A90E2") : Color.gray.opacity(0.3), lineWidth: 1.5)
+                        .stroke(isFocused ? Color(hex: "4A90E2") : (isValidName ? Color.gray.opacity(0.3) : Color.red.opacity(0.5)), lineWidth: 1.5)
                         .background(
                             RoundedRectangle(cornerRadius: 14)
                                 .fill(Color(colorScheme == .dark ? .black : .white).opacity(0.1))
                         )
                 )
                 .textFieldStyle(PlainTextFieldStyle())
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color(hex: "4A90E2").opacity(isTyping ? 0.3 : 0), lineWidth: 2)
-                )
+                .focused($isFocused)
+                .autocapitalization(.words)
+                .onChange(of: text) { newValue in
+                    isValidName = newValue.isEmpty || newValue.isValidName()
+                }
             
             Text(title)
                 .padding(.horizontal, 5)
-                .background(colorScheme == .dark ? Color(hex: "1E1E1E").opacity(isTyping || !text.isEmpty ? 1 : 0) : Color.white.opacity(isTyping || !text.isEmpty ? 1 : 0))
-                .foregroundStyle(isTyping ? Color(hex: "4A90E2") : Color.gray)
-                .font(.system(size: 14, weight: isTyping ? .medium : .regular))
+                .background(Color.bg)
+                .foregroundStyle(isFocused ? Color(hex: "4A90E2") : Color.gray)
+                .font(.system(size: 14, weight: isFocused ? .medium : .regular))
                 .padding(.leading)
-                .offset(y: isTyping || !text.isEmpty ? -27 : 0)
+                .offset(y: isFocused || !text.isEmpty ? -27 : 0)
                 .onTapGesture {
-                    isTyping = true
+                    isFocused = true
                 }
         }
-        .animation(.linear(duration: 0.2), value: isTyping)
+        .animation(.linear(duration: 0.2), value: isFocused)
+        .onChange(of: isTyping) { newValue in
+            isFocused = newValue
+        }
+    }
+}
+
+// InfoField for Phone Number
+struct InfoFieldPhone: View {
+    let title: String
+    @Binding var text: String
+    var isTyping: Bool
+    @State private var isValidPhone: Bool = true
+    @FocusState private var isFocused: Bool
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some View {
+        ZStack(alignment: .leading) {
+            TextField("", text: $text)
+                .padding(.leading)
+                .frame(height: 55)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(isFocused ? Color(hex: "4A90E2") : (isValidPhone ? Color.gray.opacity(0.3) : Color.red.opacity(0.5)), lineWidth: 1.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color(colorScheme == .dark ? .black : .white).opacity(0.1))
+                        )
+                )
+                .textFieldStyle(PlainTextFieldStyle())
+                .focused($isFocused)
+                .keyboardType(.phonePad)
+                .onChange(of: text) { newValue in
+                    isValidPhone = newValue.isEmpty || newValue.isValidPhoneNumber()
+                }
+            
+            Text(title)
+                .padding(.horizontal, 5)
+                .background(Color.bg)
+                .foregroundStyle(isFocused ? Color(hex: "4A90E2") : Color.gray)
+                .font(.system(size: 14, weight: isFocused ? .medium : .regular))
+                .padding(.leading)
+                .offset(y: isFocused || !text.isEmpty ? -27 : 0)
+                .onTapGesture {
+                    isFocused = true
+                }
+        }
+        .animation(.linear(duration: 0.2), value: isFocused)
+        .onChange(of: isTyping) { newValue in
+            isFocused = newValue
+        }
+    }
+}
+
+// Extensions for validation
+extension String {
+    func isValidName() -> Bool {
+        let nameRegex = "^[A-Za-z\\s'-]{1,50}$"
+        let namePredicate = NSPredicate(format: "SELF MATCHES %@", nameRegex)
+        return namePredicate.evaluate(with: self)
+    }
+    
+    func isValidPhoneNumber() -> Bool {
+        let phoneRegex = "^\\+?1?\\d{10,14}$"
+        let phonePredicate = NSPredicate(format: "SELF MATCHES %@", phoneRegex)
+        return phonePredicate.evaluate(with: self)
+    }
+}
+
+struct InfoFieldEmail: View {
+    let title: String
+    @Binding var text: String
+    var isTyping: Bool
+    @State private var isValidEmail: Bool = true
+    @FocusState private var isFocused: Bool
+    @Environment(\.colorScheme) var colorScheme
+    
+    var body: some View {
+        ZStack(alignment: .leading) {
+            TextField("", text: $text)
+                .padding(.leading)
+                .frame(height: 55)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(isFocused ? Color(hex: "4A90E2") : (isValidEmail ? Color.gray.opacity(0.3) : Color.red.opacity(0.5)), lineWidth: 1.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color(colorScheme == .dark ? .black : .white).opacity(0.1))
+                        )
+                )
+                .textFieldStyle(PlainTextFieldStyle())
+                .focused($isFocused)
+                .keyboardType(.emailAddress)
+                .autocapitalization(.none)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color(hex: "4A90E2").opacity(isFocused ? 0.3 : 0), lineWidth: 2)
+                )
+                .onChange(of: text) { newValue in
+                    isValidEmail = newValue.isEmpty || newValue.isValidEmail()
+                }
+            
+            Text(title)
+                .padding(.horizontal, 5)
+                .background(Color.bg)
+                .foregroundStyle(isFocused ? Color(hex: "4A90E2") : Color.gray)
+                .font(.system(size: 14, weight: isFocused ? .medium : .regular))
+                .padding(.leading)
+                .offset(y: isFocused || !text.isEmpty ? -27 : 0)
+                .onTapGesture {
+                    isFocused = true
+                }
+        }
+        .animation(.linear(duration: 0.2), value: isFocused)
+        .onChange(of: isTyping) { newValue in
+            isFocused = newValue
+        }
+    }
+}
+
+// Extension to validate email format
+extension String {
+    func isValidEmail() -> Bool {
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+        return emailPredicate.evaluate(with: self)
     }
 }
 
@@ -192,7 +318,7 @@ struct InfoFieldPassword: View {
             // Floating label
             Text(title)
                 .padding(.horizontal, 5)
-                .background(colorScheme == .dark ? Color(hex: "1E1E1E").opacity(isFocused || !text.isEmpty ? 1 : 0) : Color.white.opacity(isFocused || !text.isEmpty ? 1 : 0))
+                .background(Color.bg)
                 .foregroundStyle(isFocused ? Color(hex: "4A90E2") : Color.gray)
                 .font(.system(size: 14, weight: isFocused ? .medium : .regular))
                 .padding(.leading)
@@ -358,6 +484,21 @@ struct RegistrationLinkCard: View {
     
     var body: some View {
         HStack {
+            cardContent
+        }
+        .padding(.vertical, 15)
+        .background(cardBackground)
+        .overlay(cardBorder)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Don't have an account? Register")
+        .accessibilityHint("Navigates to registration screen")
+        .navigationDestination(isPresented: $showRegistration) {
+            Register(isFocusedName: false, isFocusedEmail: false, isFocusedNumber: false)
+        }
+    }
+    
+    private var cardContent: some View {
+        Group {
             Spacer()
             Text("Don't have an account?")
                 .foregroundColor(colorScheme == .dark ? .gray : Color(hex: "4A5568"))
@@ -378,41 +519,36 @@ struct RegistrationLinkCard: View {
             
             Spacer()
         }
-        .padding(.vertical, 15)
-        .background(
-            RoundedRectangle(cornerRadius: 15)
-                .fill(colorScheme == .dark ? Color(hex: "1E1E1E").opacity(0.6) : Color.white.opacity(0.8))
-                .shadow(color: colorScheme == .dark ? Color.black.opacity(0.2) : Color(hex: "4A90E2").opacity(0.15), radius: 12, x: 0, y: 3)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 15)
-                .strokeBorder(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color(hex: "4A90E2").opacity(0.5),
-                            Color(hex: "5E5CE6").opacity(0.2),
-                            Color.clear,
-                            Color.clear
-                        ]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Don't have an account? Register")
-        .accessibilityHint("Navigates to registration screen")
-        .navigationDestination(isPresented: $showRegistration) {
-            Register()
-        }
+    }
+    
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 15)
+            .fill(colorScheme == .dark ? Color(hex: "1E1E1E").opacity(0.6) : Color.white.opacity(0.8))
+            .shadow(color: colorScheme == .dark ? Color.black.opacity(0.2) : Color(hex: "4A90E2").opacity(0.15), radius: 12, x: 0, y: 3)
+    }
+    
+    private var cardBorder: some View {
+        RoundedRectangle(cornerRadius: 15)
+            .strokeBorder(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(hex: "4A90E2").opacity(0.5),
+                        Color(hex: "5E5CE6").opacity(0.2),
+                        Color.clear,
+                        Color.clear
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 1
+            )
     }
 }
 
 struct SignInButton: View {
     @Binding var isLoading: Bool
     @Binding var scale: CGFloat
-    @Binding var otpText: String // Add binding to the OTP text to track completion
+    @Binding var otpText: String
     var action: () -> Void
     @State private var shimmerOffset: CGFloat = -0.25
     @ObservedObject var authViewModel: AuthViewModel
@@ -424,92 +560,103 @@ struct SignInButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                if isLoading {
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(hex: "4A90E2"),
-                                    Color(hex: "5E5CE6")
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .overlay(
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.2)
-                        )
-                        .frame(height: 58)
-                } else {
-                    // Button with shimmer effect
-                    ZStack {
-                        // Base gradient - Use active colors when OTP is complete
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        isOTPComplete ? Color(hex: "4A90E2") : Color(hex: "B2BEB5"),
-                                        isOTPComplete ? Color(hex: "5E5CE6") : Color(hex: "808080")
-                                    ]),
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                        
-                        // Shimmer effect
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        Color.white.opacity(0.0),
-                                        Color.white.opacity(0.1),
-                                        Color.white.opacity(0.2),
-                                        Color.white.opacity(0.1),
-                                        Color.white.opacity(0.0)
-                                    ]),
-                                    startPoint: UnitPoint(x: shimmerOffset, y: shimmerOffset),
-                                    endPoint: UnitPoint(x: shimmerOffset + 1, y: shimmerOffset + 1)
-                                )
-                            )
-                            .onAppear {
-                                withAnimation(Animation.easeInOut(duration: 3.0).repeatForever(autoreverses: false)) {
-                                    shimmerOffset = 1.25
-                                }
-                            }
-                        
-                        // Text and icon
-                        HStack(spacing: 12) {
-                            Text("Sign In")
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                            
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
-                    }
-                    .frame(height: 58)
-                }
+                buttonContent
+                buttonOverlay
             }
+            .frame(height: 58)
             .shadow(color: Color(hex: "4A90E2").opacity(0.4), radius: 8, x: 0, y: 4)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-            )
         }
-        .disabled(authViewModel.isLoading || !isOTPComplete) // Button enabled only when OTP is complete
-        .opacity(isOTPComplete ? 1.0 : 0.7) // Visual feedback
+        .disabled(authViewModel.isLoading || !isOTPComplete)
+        .opacity(isOTPComplete ? 1.0 : 0.7)
         .scaleEffect(scale)
         .buttonStyle(BouncyButtonStyle())
         .padding(.top, 16)
         .padding(.bottom, 20)
-        // Add onChange to monitor the OTP text for completion
         .onChange(of: otpText) { newValue in
-            // Print some debug info
             print("OTP updated: \(newValue.count)/6 digits")
         }
+    }
+    
+    private var buttonContent: some View {
+        Group {
+            if isLoading {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color(hex: "4A90E2"),
+                                Color(hex: "5E5CE6")
+                            ]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .overlay(
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.2)
+                    )
+            } else {
+                ZStack {
+                    baseGradient
+                    shimmerEffect
+                    buttonTextAndIcon
+                }
+            }
+        }
+    }
+    
+    private var baseGradient: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .fill(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        isOTPComplete ? Color(hex: "4A90E2") : Color(hex: "B2BEB5"),
+                        isOTPComplete ? Color(hex: "5E5CE6") : Color(hex: "808080")
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+    }
+    
+    private var shimmerEffect: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .fill(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.white.opacity(0.0),
+                        Color.white.opacity(0.1),
+                        Color.white.opacity(0.2),
+                        Color.white.opacity(0.1),
+                        Color.white.opacity(0.0)
+                    ]),
+                    startPoint: UnitPoint(x: shimmerOffset, y: shimmerOffset),
+                    endPoint: UnitPoint(x: shimmerOffset + 1, y: shimmerOffset + 1)
+                )
+            )
+            .onAppear {
+                withAnimation(Animation.easeInOut(duration: 3.0).repeatForever(autoreverses: false)) {
+                    shimmerOffset = 1.25
+                }
+            }
+    }
+    
+    private var buttonTextAndIcon: some View {
+        HStack(spacing: 12) {
+            Text("Sign In")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+            
+            Image(systemName: "arrow.right")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+        }
+    }
+    
+    private var buttonOverlay: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
     }
 }
                 

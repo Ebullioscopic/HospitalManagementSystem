@@ -89,10 +89,10 @@ struct AppointmentHistoryCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Appointment \(appointment.appointment_id)")
+                    Text("Appointment #\(appointment.appointment_id)")
                         .font(.system(size: 18, weight: .semibold, design: .rounded))
                     
-                    Text("\(appointment.date) • Slot \(appointment.slot_id)")
+                    Text("\(formatDate(appointment.date)) • Slot \(appointment.slot_id)")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundColor(colorScheme == .dark ? .white.opacity(0.7) : .gray)
                 }
@@ -102,15 +102,45 @@ struct AppointmentHistoryCard: View {
                 StatusBadge(status: appointment.status)
             }
             
+            Divider()
+            
+            HStack {
+                // Check if staff_id exists and use it directly without optional binding
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Doctor")
+                        .font(.caption)
+                        .foregroundColor(colorScheme == .dark ? .white.opacity(0.5) : .gray.opacity(0.7))
+                    
+                    Text(appointment.staff_id ?? "Unknown Doctor")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundColor(colorScheme == .dark ? .white.opacity(0.9) : .black)
+                }
+                
+                Spacer()
+                
+                // Display slot time based on slot ID
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Time")
+                        .font(.caption)
+                        .foregroundColor(colorScheme == .dark ? .white.opacity(0.5) : .gray.opacity(0.7))
+                    
+                    Text(getTimeForSlot(appointment.slot_id))
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundColor(colorScheme == .dark ? .white.opacity(0.9) : .black)
+                }
+            }
+            
             if let reason = appointment.reason, !reason.isEmpty {
                 Text("Reason: \(reason)")
                     .font(.system(size: 14, weight: .regular, design: .rounded))
                     .foregroundColor(colorScheme == .dark ? .white.opacity(0.7) : .gray)
+                    .padding(.top, 4)
             } else {
                 Text("No reason provided")
                     .font(.system(size: 14, weight: .regular, design: .rounded))
                     .foregroundColor(colorScheme == .dark ? .white.opacity(0.5) : .gray.opacity(0.7))
                     .italic()
+                    .padding(.top, 4)
             }
         }
         .padding()
@@ -126,6 +156,36 @@ struct AppointmentHistoryCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.blue, lineWidth: 1)
         )
+    }
+    
+    private func formatDate(_ dateString: String) -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        
+        guard let date = dateFormatter.date(from: dateString) else {
+            return dateString
+        }
+        
+        dateFormatter.dateStyle = .medium
+        return dateFormatter.string(from: date)
+    }
+    
+    private func getTimeForSlot(_ slotId: Int) -> String {
+        // Simple mapping of slot ID to time
+        // You can customize this based on your app's slot timing structure
+        switch slotId {
+            case 1: return "9:00 AM - 9:30 AM"
+            case 2: return "9:30 AM - 10:00 AM"
+            case 3: return "10:00 AM - 10:30 AM"
+            case 4: return "10:30 AM - 11:00 AM"
+            case 5: return "11:00 AM - 11:30 AM"
+            case 6: return "11:30 AM - 12:00 PM"
+            case 7: return "2:00 PM - 2:30 PM"
+            case 8: return "2:30 PM - 3:00 PM"
+            case 9: return "3:00 PM - 3:30 PM"
+            case 10: return "3:30 PM - 4:00 PM"
+            default: return "Slot \(slotId)"
+        }
     }
 }
 
@@ -238,6 +298,8 @@ struct HomePatient: View {
 
 
 struct HomeContent: View {
+    @State private var appointmentForDetail: DoctorResponse.DocAppointment? = nil
+    @State private var showDetailView = false
     @Environment(\.colorScheme) var colorScheme
     @Binding var showProfile: Bool
     @State private var iconScale: CGFloat = 0.8
@@ -426,7 +488,7 @@ struct HomeContent: View {
     private var recentAppointmentsView: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Recent Appointments")
+                Text("Upcoming Appointments")
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(colorScheme == .dark ? .white : Color(hex: "2C5282"))
                 
@@ -442,11 +504,68 @@ struct HomeContent: View {
                 ErrorView(message: error) {
                     refreshAppointments {}
                 }
-            } else if appointmentHistory.isEmpty {
-                EmptyStateView(icon: "calendar.badge.exclamationmark", title: "No Appointments", message: "You don't have any recent appointments")
             } else {
-                appointmentListView
+                // Filter only upcoming appointments
+                let upcomingAppointments = appointmentHistory.filter { $0.status.lowercased() == "upcoming" }
+                
+                if upcomingAppointments.isEmpty {
+                    EmptyStateView(
+                        icon: "calendar.badge.exclamationmark",
+                        title: "No Upcoming Appointments",
+                        message: "You don't have any upcoming appointments scheduled"
+                    )
+                } else {
+                    // Use the same card style as DoctorAppointmentsView
+                    VStack(spacing: 12) {
+                        ForEach(upcomingAppointments.sorted(by: { $0.appointment_id > $1.appointment_id })) { appointment in
+                            // Convert the PatientAppointHistoryListResponse to DocAppointment format
+                            let docAppointment = DoctorResponse.DocAppointment(
+                                appointmentId: appointment.appointment_id,
+                                date: appointment.date,
+                                slotId: appointment.slot_id,
+                                staffId: appointment.staff_id ?? "Unknown",
+                                patientId: appointment.patient_id,
+                                status: appointment.status
+                            )
+                            
+                            Button(action: {
+                                // Set the selected appointment and show the detail view
+                                appointmentForDetail = docAppointment
+                                showDetailView = true
+                            }) {
+                                AppointmentRow(appointment: docAppointment)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.horizontal)
+                }
             }
+        }
+        // Update sheet to use appointmentForDetail instead of selectedAppointment
+        .sheet(isPresented: $showDetailView) {
+            if let appointment = appointmentForDetail {
+                AppointmentDetailView(appointment: appointment)
+            }
+        }
+    }
+
+    // Helper function to map slot IDs to time ranges
+    private func getTimeForSlot(_ slotId: Int) -> String {
+        // Simple mapping of slot ID to time
+        // You can customize this based on your app's slot timing structure
+        switch slotId {
+            case 1: return "9:00 AM - 9:30 AM"
+            case 2: return "9:30 AM - 10:00 AM"
+            case 3: return "10:00 AM - 10:30 AM"
+            case 4: return "10:30 AM - 11:00 AM"
+            case 5: return "11:00 AM - 11:30 AM"
+            case 6: return "11:30 AM - 12:00 PM"
+            case 7: return "2:00 PM - 2:30 PM"
+            case 8: return "2:30 PM - 3:00 PM"
+            case 9: return "3:00 PM - 3:30 PM"
+            case 10: return "3:30 PM - 4:00 PM"
+            default: return "Slot \(slotId)"
         }
     }
     

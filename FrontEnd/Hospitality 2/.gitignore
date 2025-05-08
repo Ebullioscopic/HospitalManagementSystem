@@ -1,0 +1,17 @@
+venv
+
+# Xcode user data
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+*.xccheckout
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcdebugger/
+*.xcbkptlist
+
+# Build and derived data
+DerivedData/
+build/
+
+# macOS metadata
+.DS_Store
