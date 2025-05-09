@@ -49,33 +49,41 @@ struct ShiftsView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            headerSection
-            
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Stats Dashboard
-                    statsDashboard
-                    
-                    // Filter Section with Segmented Control
-                    filterSection
-                    
-                    // Shifts Content - Different UI based on filter
-                    if selectedFilter == .booked {
-                        bookedShiftsSection
-                    } else {
-                        availableShiftsSection
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 20)
-            }
-            .background(
-                colorScheme == .dark ?
-                    Color(hex: "121212").ignoresSafeArea() :
-                    Color(hex: "F7F8FA").ignoresSafeArea()
+        ZStack {
+            // Background gradient
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    colorScheme == .dark ? Color(hex: "101420") : Color(hex: "E8F5FF"),
+                    colorScheme == .dark ? Color(hex: "1A202C") : Color(hex: "F0F8FF")
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
+            .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header
+                headerSection
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Stats Dashboard
+                        statsDashboard
+                        
+                        // Filter Section with Segmented Control
+                        filterSection
+                        
+                        // Shifts Content - Different UI based on filter
+                        if selectedFilter == .booked {
+                            bookedShiftsSection
+                        } else {
+                            availableShiftsSection
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 20)
+                }
+            }
         }
         .onReceive(timer) { _ in
             currentDate = Date()
@@ -95,7 +103,7 @@ struct ShiftsView: View {
                     Text("My Shifts")
                         .font(.system(size: 28, weight: .bold))
                     
-                    Text("Manage your schedule")
+                    Text("Today's Overview")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }

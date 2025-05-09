@@ -346,7 +346,7 @@ struct ProfileView: View {
                 
                 InfoPill(
                     title: "ID",
-                    value: "#\(patientData?.patient_id ?? 0)",
+                    value: "\(patientData?.patient_id ?? 0)",
                     icon: "number",
                     color: successColor,
                     colorScheme: colorScheme

@@ -9,6 +9,13 @@ import SwiftUI
 
 @main
 struct HospitalityApp: App {
+    
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
+    init() {
+            NotificationManager.shared.requestAuthorization()
+        }
+    
     var body: some Scene {
         WindowGroup {
             RootView()

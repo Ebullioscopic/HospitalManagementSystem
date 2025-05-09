@@ -513,15 +513,19 @@ struct FilterPill1: View {
 
 struct AppointmentRow: View {
     let appointment: DoctorResponse.DocAppointment
+    @State private var slotStartTime: String = "Loading..."
+    @State private var isSlotLoading: Bool = false
+    @State private var staffName: String = "Loading..."
+    @State private var isStaffNameLoading: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Appointment #\(appointment.appointmentId)")
+                    Text(staffName)
                         .font(.system(size: 18, weight: .semibold, design: .rounded))
                     
-                    Text("\(formatDate(appointment.date)) • Slot \(appointment.slotId)")
+                    Text("\(formatDate(appointment.date)) • \(slotStartTime)")
                         .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundColor(.secondary)
                 }
@@ -546,11 +550,11 @@ struct AppointmentRow: View {
                 Spacer()
                 
                 Label {
-                    Text("Patient #\(appointment.patientId)")
+                    Text("Appointment #\(appointment.appointmentId)")
                         .font(.system(size: 14, weight: .regular, design: .rounded))
                         .foregroundColor(.secondary)
                 } icon: {
-                    Image(systemName: "person")
+                    Image(systemName: "calendar")
                         .foregroundColor(.blue)
                 }
             }
@@ -562,6 +566,10 @@ struct AppointmentRow: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
         )
+        .onAppear {
+            loadSlotTime()
+            loadStaffName()
+        }
     }
     
     private func formatDate(_ dateString: String) -> String {
@@ -575,8 +583,90 @@ struct AppointmentRow: View {
         dateFormatter.dateStyle = .medium
         return dateFormatter.string(from: date)
     }
+    
+    private func loadSlotTime() {
+        guard !isSlotLoading else { return }
+        
+        isSlotLoading = true
+        
+        Task {
+            do {
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "yyyy-MM-dd"
+                guard let appointmentDate = dateFormatter.date(from: String(appointment.date.prefix(10))) else {
+                    throw NetworkError.unknownError
+                }
+                
+                let dateString = dateFormatter.string(from: appointmentDate)
+                let slots = try await DoctorServices().fetchDoctorSlots(doctorId: appointment.staffId, date: dateString)
+                
+                if let slot = slots.first(where: { $0.slot_id == appointment.slotId }) {
+                    let timeFormatter = DateFormatter()
+                    timeFormatter.dateFormat = "HH:mm:ss"
+                    if let timeDate = timeFormatter.date(from: slot.slot_start_time) {
+                        timeFormatter.dateFormat = "HH:mm"
+                        DispatchQueue.main.async {
+                            slotStartTime = timeFormatter.string(from: timeDate)
+                            isSlotLoading = false
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            slotStartTime = "N/A"
+                            isSlotLoading = false
+                        }
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        slotStartTime = "N/A"
+                        isSlotLoading = false
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    slotStartTime = "N/A"
+                    isSlotLoading = false
+                }
+            }
+        }
+    }
+    
+    private func loadStaffName() {
+        guard !isStaffNameLoading else { return }
+        
+        isStaffNameLoading = true
+        
+        Task {
+            do {
+                guard let url = URL(string: "\(Constants.baseURL)/hospital/general/doctors/\(appointment.staffId)/") else {
+                    throw NetworkError.invalidURL
+                }
+                
+                var request = URLRequest(url: url)
+                request.httpMethod = "GET"
+                request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.addValue("Bearer \(UserDefaults.accessToken)", forHTTPHeaderField: "Authorization")
+                
+                let (data, response) = try await URLSession.shared.data(for: request)
+                
+                guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                    throw NetworkError.invalidResponse
+                }
+                
+                let doctor = try JSONDecoder().decode(PatientSpecificDoctorResponse.self, from: data)
+                
+                DispatchQueue.main.async {
+                    staffName = doctor.staff_name
+                    isStaffNameLoading = false
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    staffName = "Unknown Doctor"
+                    isStaffNameLoading = false
+                }
+            }
+        }
+    }
 }
-
 // MARK: - StatusBadge
 struct StatusBadge: View {
     let status: String

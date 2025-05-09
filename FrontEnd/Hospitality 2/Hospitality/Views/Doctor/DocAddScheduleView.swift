@@ -1,12 +1,4 @@
 //
-//  DocAddScheduleView.swift
-//  Hospitality
-//
-//  Created by admin64 on 06/05/25.
-//
-
-
-//
 //  AddScheduleView.swift
 //  Hospitality
 //
@@ -76,15 +68,9 @@ struct DocAddScheduleView: View {
             
             datePicker
             
-            HStack {
-                Text("Available Slots")
-                    .font(.headline)
-                Spacer()
-                Text("\(selectedSlots.count)/2 selected")
-                    .font(.caption)
-                    .foregroundColor(selectedSlots.count == 2 ? .green : .gray)
-            }
-            .padding(.horizontal)
+            Text("Available Slots")
+                .font(.headline)
+                .padding(.horizontal)
             
             ForEach(availableSlots, id: \.id) { slot in
                 slotToggle(slot: slot)
@@ -117,8 +103,7 @@ struct DocAddScheduleView: View {
                 get: { selectedSlots.contains(slot.id) },
                 set: { isSelected in
                     if isSelected {
-                        // Only allow selection if less than 2 slots are selected or this slot is already selected
-                        if selectedSlots.count < 2 || selectedSlots.contains(slot.id) {
+                        if selectedSlots.count < 1 {
                             selectedSlots.insert(slot.id)
                         }
                     } else {
@@ -129,13 +114,13 @@ struct DocAddScheduleView: View {
                 Text(slot.name)
                     .font(.subheadline)
             }
-            .disabled(!selectedSlots.contains(slot.id) && selectedSlots.count >= 2) // Disable if not selected and already 2 selected
+            .disabled(!selectedSlots.contains(slot.id) && selectedSlots.count >= 2)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-            .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemBackground)))
+                .fill(colorScheme == .dark ? Color(.systemGray6) : Color(.systemBackground)))
     }
     
     private var submitButton: some View {
@@ -151,7 +136,7 @@ struct DocAddScheduleView: View {
             }
             .frame(maxWidth: .infinity)
             .padding()
-            .background(Color.blue)
+            .background(Color(hex:"0077CC"))
             .foregroundColor(.white)
             .cornerRadius(10)
         }

@@ -6,53 +6,67 @@ struct AppointmentDetailsView: View {
     @State private var showingVitalsForm = false
     @State private var currentDate = Date()
     @State private var currentUser = "swatiswapna"
+    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Appointment header with status
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text("Appointment #\(appointment.appointmentId)")
-                            .font(.title2)
-                            .fontWeight(.bold)
+        ZStack {
+            // Background gradient
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    colorScheme == .dark ? Color(hex: "101420") : Color(hex: "E8F5FF"),
+                    colorScheme == .dark ? Color(hex: "1A202C") : Color(hex: "F0F8FF")
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Appointment header with status
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Appointment #\(appointment.appointmentId)")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            
+                            Text(formattedDate(appointment.date))
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
                         
-                        Text(formattedDate(appointment.date))
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        Spacer()
+                        
+                        StatusBadge(status: appointment.status)
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    
+                    // Patient information section
+                    PatientInfoSection(
+                        patientId: appointment.patientId,
+                        viewModel: viewModel
+                    )
+                    
+                    // Appointment details section
+                    AppointmentInfoSection(appointment: appointment)
+                    
+                    // Vitals section (if available)
+                    if let vitals = viewModel.patientVitals {
+                        VitalsSection(vitals: vitals)
                     }
                     
-                    Spacer()
-                    
-                    StatusBadge(status: appointment.status)
+                    // Action buttons
+                    ActionButtonsSection(
+                        appointmentId: appointment.appointmentId,
+                        patientId: appointment.patientId,
+                        showingVitalsForm: $showingVitalsForm,
+                        isAppointmentCompleted: appointment.status.lowercased() == "completed"
+                    )
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
-                
-                // Patient information section
-                PatientInfoSection(
-                    patientId: appointment.patientId,
-                    viewModel: viewModel
-                )
-                
-                // Appointment details section
-                AppointmentInfoSection(appointment: appointment)
-                
-                // Vitals section (if available)
-                if let vitals = viewModel.patientVitals {
-                    VitalsSection(vitals: vitals)
-                }
-                
-                // Action buttons
-                ActionButtonsSection(
-                    appointmentId: appointment.appointmentId,
-                    patientId: appointment.patientId,
-                    showingVitalsForm: $showingVitalsForm,
-                    isAppointmentCompleted: appointment.status.lowercased() == "completed"
-                )
             }
-            .padding()
         }
         .navigationTitle("Appointment Details")
         .onAppear {
@@ -246,6 +260,7 @@ import SwiftUI
 struct VitalsFormView: View {
     let appointmentId: Int
     @ObservedObject var viewModel: DoctorViewModel
+    @Environment(\.colorScheme) var colorScheme
     
     // Input fields with validation wrappers
     @State private var heightInput = ValidatedInput(
@@ -284,7 +299,6 @@ struct VitalsFormView: View {
     )
     
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) var colorScheme
     
     // MARK: - Color Scheme
     private let primaryColor = Color(hex: "0077CC")
@@ -295,145 +309,135 @@ struct VitalsFormView: View {
     @State private var navigateToConsultation = false
     
     var body: some View {
-       
-            ZStack {
-                // Background gradient
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        colorScheme == .dark ? Color(hex: "101420") : Color(hex: "F7FAFF"),
-                        colorScheme == .dark ? Color(hex: "1A202C") : Color(hex: "ECF3FF")
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                
-                VStack(spacing: 0) {
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            // Vital signs form
-                            VStack(spacing: 16) {
-                                // Each vital sign input with consistent styling
-                                VitalFieldView(input: $heightInput)
-                                VitalFieldView(input: $weightInput)
-                                VitalFieldView(input: $heartRateInput)
-                                VitalFieldView(input: $spo2Input)
-                                VitalFieldView(input: $temperatureInput)
-                            }
-                            .padding(.horizontal)
-                            
-                            // Status messages
-                            if viewModel.isLoading || !viewModel.enterVitalsMessage.isEmpty || viewModel.errorMessage != nil {
-                                VStack {
-                                    if viewModel.isLoading {
-                                        HStack {
-                                            Spacer()
-                                            ProgressView("Saving vitals...")
-                                                .progressViewStyle(CircularProgressViewStyle())
-                                            Spacer()
-                                        }
-                                    } else if !viewModel.enterVitalsMessage.isEmpty {
-                                        StatusView(
-                                            icon: "checkmark.circle.fill",
-                                            color: .green,
-                                            message: viewModel.enterVitalsMessage
-                                        )
-                                    } else if let errorMessage = viewModel.errorMessage {
-                                        StatusView(
-                                            icon: "exclamationmark.triangle.fill",
-                                            color: .red,
-                                            message: errorMessage
-                                        )
-                                    }
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(colorScheme == .dark ?
-                                            Color(UIColor.secondarySystemBackground) :
-                                            Color(UIColor.tertiarySystemBackground)
-                                        )
-                                )
-                                .padding(.horizontal)
-                            }
-                            
-                            Spacer(minLength: 20)
+        ZStack {
+            // Background gradient
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    colorScheme == .dark ? Color(hex: "101420") : Color(hex: "E8F5FF"),
+                    colorScheme == .dark ? Color(hex: "1A202C") : Color(hex: "F0F8FF")
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Vital signs form
+                        VStack(spacing: 16) {
+                            // Each vital sign input with consistent styling
+                            VitalFieldView(input: $heightInput)
+                            VitalFieldView(input: $weightInput)
+                            VitalFieldView(input: $heartRateInput)
+                            VitalFieldView(input: $spo2Input)
+                            VitalFieldView(input: $temperatureInput)
                         }
-                        .padding(.bottom, 80)
-                    }
-                    
-                    // Fixed action buttons at bottom
-                    VStack(spacing: 12) {
-                        // Save Vitals button
-                        Button(action: submitVitals) {
-                            HStack {
-                                Text("Save Vitals")
-                                    .fontWeight(.semibold)
-                                
+                        .padding(.horizontal)
+                        
+                        // Status messages
+                        if viewModel.isLoading || !viewModel.enterVitalsMessage.isEmpty || viewModel.errorMessage != nil {
+                            VStack {
                                 if viewModel.isLoading {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                        .padding(.leading, 5)
+                                    HStack {
+                                        Spacer()
+                                        ProgressView("Saving vitals...")
+                                            .progressViewStyle(CircularProgressViewStyle())
+                                        Spacer()
+                                    }
+                                } else if !viewModel.enterVitalsMessage.isEmpty {
+                                    StatusView(
+                                        icon: "checkmark.circle.fill",
+                                        color: .green,
+                                        message: viewModel.enterVitalsMessage
+                                    )
+                                } else if let errorMessage = viewModel.errorMessage {
+                                    StatusView(
+                                        icon: "exclamationmark.triangle.fill",
+                                        color: .red,
+                                        message: errorMessage
+                                    )
                                 }
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
+                            .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .fill(isFormValid ? primaryColor : Color.gray)
-                                    .shadow(color: isFormValid ? primaryColor.opacity(0.3) : Color.clear, radius: 4, y: 2)
-                            )
-                            .foregroundColor(.white)
-                        }
-                        .disabled(viewModel.isLoading || !isFormValid)
-                        
-                        // Proceed to Consultation button (shown only after successful save)
-                        if !viewModel.enterVitalsMessage.isEmpty && viewModel.errorMessage == nil {
-                            NavigationLink(
-                                destination: DoctorConsultationView(appointmentId: appointmentId),
-                                isActive: $navigateToConsultation
-                            ) {
-                                Button(action: {
-                                    navigateToConsultation = true
-                                }) {
-                                    HStack {
-                                        Text("Proceed to Consultation")
-                                            .fontWeight(.semibold)
-                                        Image(systemName: "arrow.right")
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(secondaryColor)
-                                            .shadow(color: secondaryColor.opacity(0.3), radius: 4, y: 2)
+                                    .fill(colorScheme == .dark ?
+                                        Color(UIColor.secondarySystemBackground) :
+                                        Color(UIColor.tertiarySystemBackground)
                                     )
-                                    .foregroundColor(.white)
+                            )
+                            .padding(.horizontal)
+                        }
+                        
+                        Spacer(minLength: 20)
+                    }
+                    .padding(.bottom, 80)
+                }
+                
+                // Fixed action buttons at bottom
+                VStack(spacing: 12) {
+                    // Save Vitals button
+                    Button(action: submitVitals) {
+                        HStack {
+                            Text("Save Vitals")
+                                .fontWeight(.semibold)
+                            
+                            if viewModel.isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .padding(.leading, 5)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(isFormValid ? primaryColor : Color.gray)
+                                .shadow(color: isFormValid ? primaryColor.opacity(0.3) : Color.clear, radius: 4, y: 2)
+                        )
+                        .foregroundColor(.white)
+                    }
+                    .disabled(viewModel.isLoading || !isFormValid)
+                    
+                    // Proceed to Consultation button (shown only after successful save)
+                    if !viewModel.enterVitalsMessage.isEmpty && viewModel.errorMessage == nil {
+                        NavigationLink(
+                            destination: DoctorConsultationView(appointmentId: appointmentId),
+                            isActive: $navigateToConsultation
+                        ) {
+                            Button(action: {
+                                navigateToConsultation = true
+                            }) {
+                                HStack {
+                                    Text("Proceed to Consultation")
+                                        .fontWeight(.semibold)
+                                    Image(systemName: "arrow.right")
                                 }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(secondaryColor)
+                                        .shadow(color: secondaryColor.opacity(0.3), radius: 4, y: 2)
+                                )
+                                .foregroundColor(.white)
                             }
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 12)
-                    .background(
-                        Rectangle()
-                            .fill(colorScheme == .dark ? Color(hex: "101420").opacity(0.9) : Color(hex: "F7FAFF").opacity(0.9))
-                            .blur(radius: 3)
-                            .shadow(color: Color.black.opacity(0.1), radius: 5, y: -5)
-                    )
                 }
+                .padding(.horizontal)
+                .padding(.vertical, 12)
+                .background(
+                    Rectangle()
+                        .fill(colorScheme == .dark ? Color(hex: "101420").opacity(0.9) : Color(hex: "F7FAFF").opacity(0.9))
+                        .blur(radius: 3)
+                        .shadow(color: Color.black.opacity(0.1), radius: 5, y: -5)
+                )
             }
-            .navigationTitle("Enter Vitals")
-            .navigationBarTitleDisplayMode(.inline)
-//            .toolbar {
-//                ToolbarItem(placement: .navigationBarTrailing) {
-//                    Button(action: { dismiss() }) {
-//                        Image(systemName: "xmark.circle.fill")
-//                            .foregroundColor(.gray)
-//                    }
-//                }
-//            }
-        
+        }
+        .navigationTitle("Enter Vitals")
+        .navigationBarTitleDisplayMode(.inline)
     }
     
     // MARK: - Properties

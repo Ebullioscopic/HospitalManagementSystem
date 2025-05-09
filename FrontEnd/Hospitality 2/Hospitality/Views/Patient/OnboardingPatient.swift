@@ -21,7 +21,7 @@ struct OnboardingPatient: View {
     
     let screens = [
         OnboardingScreen1(
-            title: "Book Appointments",
+            title: "Book Appments",
             icon: "Calendar",
             description: "Schedule visits with ease",
             features: [

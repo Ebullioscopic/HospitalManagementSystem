@@ -5,6 +5,7 @@ struct PaymentSuccessView: View {
     @Environment(\.presentationMode) var presentationMode
     let transactionId: String
     let paymentAmount: Double
+    var onDone: (() -> Void)? // Add completion handler
     
     // Animation states
     @State private var showCircle = false
@@ -132,6 +133,7 @@ struct PaymentSuccessView: View {
                 
                 // Done button
                 Button(action: {
+                    onDone?() // Call the completion handler
                     presentationMode.wrappedValue.dismiss()
                 }) {
                     Text("DONE")

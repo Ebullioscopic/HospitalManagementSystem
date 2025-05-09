@@ -31,7 +31,7 @@ struct DoctorDashboardView: View {
                                     .font(.title)
                                     .fontWeight(.bold)
 
-                                Text("Today's summary")
+                                Text("Manage your appointments")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                             }
@@ -58,7 +58,7 @@ struct DoctorDashboardView: View {
                             Image(systemName: "calendar")
                                 .foregroundColor(.blue)
 
-                            Text("Today's Appointments")
+                            Text("Appointment Overview")
                                 .font(.headline)
                                 .fontWeight(.medium)
                         }

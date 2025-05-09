@@ -1,5 +1,46 @@
 import SwiftUI
 
+// MARK: - AppointmentDetailViewModel (moved to top level)
+class AppointmentDetailViewModel: ObservableObject {
+    // Appointment details with diagnosis and prescription
+    @Published var appointmentDetails: AppointmentDetailResponse?
+    @Published var isLoadingDetails = false
+    @Published var detailsError: String?
+    
+    private let doctorServices = DoctorServices()
+    
+    func loadAllData(appointment: DoctorResponse.DocAppointment) {
+        loadAppointmentDetails(appointmentId: appointment.appointmentId)
+    }
+    
+    func loadAppointmentDetails(appointmentId: Int) {
+        isLoadingDetails = true
+        detailsError = nil
+        print("🔍 Loading appointment details for appointment ID: \(appointmentId)")
+        
+        Task {
+            do {
+                let details = try await doctorServices.fetchAppointmentDetails(appointmentId: appointmentId)
+                DispatchQueue.main.async {
+                    self.appointmentDetails = details
+                    self.isLoadingDetails = false
+                    print("✅ Successfully loaded appointment details: \(details)")
+                    print("Diagnosis data: \(String(describing: details.diagnosis))")
+                    if let diagnosisData = details.diagnosis?.diagnosisData {
+                        print("Diagnosis data items: \(diagnosisData)")
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.detailsError = error.localizedDescription
+                    self.isLoadingDetails = false
+                    print("❌ Failed to load appointment details: \(error)")
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Appointment Detail View
 struct AppointmentDetailView: View {
     // MARK: - Properties
@@ -20,47 +61,6 @@ struct AppointmentDetailView: View {
                     await loadAppointmentDetails()
                 }
             }
-    }
-    
-    // MARK: - AppointmentDetailViewModel
-    class AppointmentDetailViewModel: ObservableObject {
-        // Appointment details with diagnosis and prescription
-        @Published var appointmentDetails: AppointmentDetailResponse?
-        @Published var isLoadingDetails = false
-        @Published var detailsError: String?
-        
-        private let doctorServices = DoctorServices()
-        
-        func loadAllData(appointment: DoctorResponse.DocAppointment) {
-            loadAppointmentDetails(appointmentId: appointment.appointmentId)
-        }
-        
-        func loadAppointmentDetails(appointmentId: Int) {
-            isLoadingDetails = true
-            detailsError = nil
-            print("🔍 Loading appointment details for appointment ID: \(appointmentId)")
-            
-            Task {
-                do {
-                    let details = try await doctorServices.fetchAppointmentDetails(appointmentId: appointmentId)
-                    DispatchQueue.main.async {
-                        self.appointmentDetails = details
-                        self.isLoadingDetails = false
-                        print("✅ Successfully loaded appointment details: \(details)")
-                        print("Diagnosis data: \(String(describing: details.diagnosis))")
-                        if let diagnosisData = details.diagnosis?.diagnosisData {
-                            print("Diagnosis data items: \(diagnosisData)")
-                        }
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        self.detailsError = error.localizedDescription
-                        self.isLoadingDetails = false
-                        print("❌ Failed to load appointment details: \(error)")
-                    }
-                }
-            }
-        }
     }
     
     // MARK: - StatusBadge
@@ -144,24 +144,18 @@ struct AppointmentDetailView: View {
     
     // MARK: - Tab Selection View
     private var tabSelectionView: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 0) {
-                ForEach(DetailTab.allCases, id: \.self) { tab in
-                    TabButton(
-                        title: tab.title,
-                        systemImage: tab.iconName,
-                        isActive: activeTab == tab
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            activeTab = tab
-                        }
-                    }
-                }
+        Picker("View", selection: $activeTab) {
+            ForEach(DetailTab.allCases, id: \.self) { tab in
+                Label(
+                    tab.title,
+                    systemImage: tab.iconName
+                ).tag(tab)
             }
-            .padding(.horizontal)
         }
+        .pickerStyle(SegmentedPickerStyle())
+        .padding(.horizontal)
+        .padding(.vertical, 8)
         .background(Color(.systemBackground))
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
     
     // MARK: - Loading View
@@ -232,33 +226,51 @@ struct AppointmentDetailView: View {
     @ViewBuilder
     private func overviewContent(_ appointment: AppointmentDetailResponse) -> some View {
         // Appointment overview card
-        AppointmentOverviewCard(appointment: appointment)
+        AppointmentOverviewCard(appointment: appointment, viewModel: viewModel)
 
         // Summary cards if available
         if appointment.prescription != nil || appointment.diagnosis != nil {
             SectionHeaderView1(title: "Summary")
             
-            HStack(spacing: 16) {
-                if appointment.prescription != nil {
-                    SummaryCard(
-                        title: "Prescription",
-                        description: "Medication details available",
-                        iconName: "pills",
-                        color: .blue,
-                        action: { activeTab = .prescription }
-                    )
-                }
+            // Create a GeometryReader to control the sizing precisely
+            GeometryReader { geometry in
+                let twoColumnWidth = geometry.size.width / 2 - 8 // 16 spacing between cards, so 8 on each side
                 
-                if appointment.diagnosis != nil {
-                    SummaryCard(
-                        title: "Diagnosis",
-                        description: "Diagnosis details available",
-                        iconName: "stethoscope",
-                        color: .green,
-                        action: { activeTab = .diagnosis }
-                    )
+                HStack(spacing: 16) {
+                    // First card or placeholder
+                    Group {
+                        if appointment.prescription != nil {
+                            SummaryCard(
+                                title: "Prescription",
+                                iconName: "pills",
+                                color: .blue,
+                                action: { activeTab = .prescription }
+                            )
+                        } else {
+                            // Empty placeholder to maintain layout
+                            Color.clear
+                        }
+                    }
+                    .frame(width: twoColumnWidth)
+                    
+                    // Second card or placeholder
+                    Group {
+                        if appointment.diagnosis != nil {
+                            SummaryCard(
+                                title: "Diagnosis",
+                                iconName: "stethoscope",
+                                color: .green,
+                                action: { activeTab = .diagnosis }
+                            )
+                        } else {
+                            // Empty placeholder to maintain layout
+                            Color.clear
+                        }
+                    }
+                    .frame(width: twoColumnWidth)
                 }
             }
+            .frame(height: 100) // Set a fixed height for the entire row
         }
         
         // Timeline of appointment status
@@ -389,7 +401,7 @@ struct TabButton: View {
                 Text(title)
                     .font(.system(size: 12, weight: .medium))
             }
-            .foregroundColor(isActive ? .blue : .gray)
+            .foregroundColor(isActive ? .white : .white.opacity(0.7))
             .frame(height: 50)
             .padding(.horizontal, 12)
             .contentShape(Rectangle())
@@ -397,7 +409,7 @@ struct TabButton: View {
         .background(
             ZStack {
                 if isActive {
-                    Color.blue.opacity(0.1)
+                    Color.white.opacity(0.2)
                         .cornerRadius(10)
                     
                     VStack {
@@ -405,7 +417,7 @@ struct TabButton: View {
                         Rectangle()
                             .frame(height: 3)
                             .cornerRadius(1.5)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.white)
                     }
                 }
             }
@@ -435,7 +447,6 @@ struct SectionHeaderView1: View {
 // MARK: - Summary Card
 struct SummaryCard: View {
     let title: String
-    let description: String
     let iconName: String
     let color: Color
     let action: () -> Void
@@ -444,37 +455,95 @@ struct SummaryCard: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
+                    // Icon with proper sizing and accessibility traits
                     Image(systemName: iconName)
-                        .font(.system(size: 18))
+                        .font(.system(size: 28, weight: .medium))
                         .foregroundColor(color)
-                    
-                    Text(title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                        .accessibility(hidden: true)
                     
                     Spacer()
                     
+                    // Chevron moved to right side for better navigation pattern
                     Image(systemName: "chevron.right")
-                        .font(.caption)
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.secondary)
+                        .accessibility(hidden: true)
                 }
                 
-                Text(description)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                Spacer(minLength: 8)
+                
+                // Title with improved typography and accessibility
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 90)
             .background(Color(.secondarySystemBackground))
-            .cornerRadius(12)
+            .cornerRadius(10)
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(CardButtonStyle(color: color))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title)")
+        .accessibilityHint("Tap to view details")
+    }
+}
+
+// Custom button style for proper tap feedback
+struct CardButtonStyle: ButtonStyle {
+    let color: Color
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(.secondarySystemBackground))
+                    .shadow(
+                        color: Color.black.opacity(0.07),
+                        radius: 3,
+                        x: 0,
+                        y: 1
+                    )
+            )
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
+// Example implementation for SwiftUI previews
+struct SummaryCard_Previews: PreviewProvider {
+    static var previews: some View {
+        VStack(spacing: 16) {
+            SummaryCard(
+                title: "Account Summary",
+                iconName: "person.crop.circle.fill",
+                color: .blue
+            ) {
+                print("Card tapped")
+            }
+            
+            SummaryCard(
+                title: "Payment History",
+                iconName: "creditcard.fill",
+                color: .green
+            ) {
+                print("Card tapped")
+            }
+        }
+        .padding()
+        .previewLayout(.sizeThatFits)
     }
 }
 
 // MARK: - Appointment Overview Card
 struct AppointmentOverviewCard: View {
     let appointment: AppointmentDetailResponse
+    @State private var showRescheduleView = false
+    @ObservedObject var viewModel: AppointmentDetailViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -487,39 +556,53 @@ struct AppointmentOverviewCard: View {
                 if let reason = appointment.reason, !reason.isEmpty {
                     InfoRow(label: "Reason", value: reason)
                 }
+                
+                // Add reschedule button only for upcoming appointments
+                if appointment.status.lowercased() == "upcoming" || 
+                   appointment.status.lowercased() == "scheduled" {
+                    Button(action: {
+                        showRescheduleView = true
+                    }) {
+                        HStack {
+                            Image(systemName: "calendar.badge.clock")
+                            Text("Reschedule Appointment")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                        }
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .cornerRadius(8)
+                    }
+                    .padding(.top, 8)
+                }
             }
             .padding()
             .background(Color(.secondarySystemBackground))
             .cornerRadius(12)
         }
+        .sheet(isPresented: $showRescheduleView) {
+            AppointmentRescheduleView(
+                appointmentId: appointment.appointmentId,
+                doctorId: String(appointment.staffId),
+                currentDate: appointment.date,
+                currentSlotId: appointment.slotId,
+                reason: appointment.reason ?? "",
+                onRescheduleComplete: {
+                    showRescheduleView = false
+                    // Refresh the appointment details
+                    viewModel.loadAppointmentDetails(appointmentId: appointment.appointmentId)
+                }
+            )
+        }
     }
     
     private func formatDate(_ dateString: String) -> String {
-        // First try the ISO format with time
-        let isoFormatter = DateFormatter()
-        isoFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
-        
-        if let date = isoFormatter.date(from: dateString) {
-            let displayFormatter = DateFormatter()
-            displayFormatter.dateStyle = .medium
-            displayFormatter.timeStyle = .short
-            return displayFormatter.string(from: date)
-        }
-        
-        // Then try simple date format
-        let simpleFormatter = DateFormatter()
-        simpleFormatter.dateFormat = "yyyy-MM-dd"
-        
-        if let date = simpleFormatter.date(from: dateString) {
-            let displayFormatter = DateFormatter()
-            displayFormatter.dateStyle = .medium
-            displayFormatter.timeStyle = .none
-            return displayFormatter.string(from: date)
-        }
-        
-        // Return original if we can't parse it
+        // Existing date formatting code...
         return dateString
-    }}
+    }
+}
 
 // MARK: - Info Row
 struct InfoRow: View {

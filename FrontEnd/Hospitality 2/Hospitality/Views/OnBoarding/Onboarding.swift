@@ -66,10 +66,10 @@ struct PatientOnboarding: View {
             icon: "heart.fill",
             description: "Your healthcare simplified",
             features: [
-                "Book appointments",
-                "View test results",
-                "Message your doctor",
-                "Manage prescriptions"
+                "Get Doctor Recommandations",
+                "Book Appointments",
+                "View Test Results",
+                "View Prescriptions"
             ],
             buttonText: "Access My Health",
             destination: AnyView(HomePatient())

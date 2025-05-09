@@ -4,7 +4,7 @@ class DoctorServices {
     private let baseURL = Constants.baseURL2
     
     // Use the secure session for all requests
-     var session: URLSession {
+    var session: URLSession {
         URLSession.ngrokSession
     }
     
@@ -17,6 +17,74 @@ class DoctorServices {
         let urlString = base + path
         print("[SwatiSwapna] Building URL: \(urlString)")
         return URL(string: urlString)
+    }
+    
+    //
+    func fetchAppointmentDetails(appointmentId: Int) async throws -> AppointmentDetailResponse {
+        guard let url = URL(string: "http://ec2-13-127-223-203.ap-south-1.compute.amazonaws.com/api/hospital/general/appointments/\(appointmentId)/") else {
+            print("[SwatiSwapna] Invalid URL for appointment details")
+            throw NetworkError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        let token = UserDefaults.accessToken
+        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        print("[SwatiSwapna] Fetching details for appointmentId: \(appointmentId)")
+        print("[SwatiSwapna] Constructed URL: \(url.absoluteString)")
+        print("[SwatiSwapna] Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        print("[SwatiSwapna] Access token: \(token.isEmpty ? "Empty" : "Present")")
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        print("[SwatiSwapna] Appointment details status: \(httpResponse.statusCode)")
+        if let rawData = String(data: data, encoding: .utf8) {
+            print("[SwatiSwapna] Raw response: \(rawData)")
+        }
+        
+        switch httpResponse.statusCode {
+        case 200...299:
+            do {
+                let decoder = JSONDecoder()
+                let appointmentDetails = try decoder.decode(AppointmentDetailResponse.self, from: data)
+                print("[SwatiSwapna] Successfully decoded appointment details for ID: \(appointmentDetails.appointmentId)")
+                
+                // Add these diagnostic prints
+                print("[DEBUG] Appointment date from API: \(appointmentDetails.date)")
+                
+                // Log parsed date to verify format
+                let isoFormatter = DateFormatter()
+                isoFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+                
+                let simpleFormatter = DateFormatter()
+                simpleFormatter.dateFormat = "yyyy-MM-dd"
+                
+                if let date = isoFormatter.date(from: appointmentDetails.date) {
+                    print("[DEBUG] Successfully parsed as ISO date: \(date)")
+                } else if let date = simpleFormatter.date(from: appointmentDetails.date) {
+                    print("[DEBUG] Successfully parsed as simple date: \(date)")
+                } else {
+                    print("[DEBUG] Could not parse date format: \(appointmentDetails.date)")
+                }
+                
+                return appointmentDetails
+            } catch {
+                print("[SwatiSwapna] Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        case 401:
+            throw NetworkError.unauthorized
+        case 404:
+            throw NetworkError.notFound("Appointment with ID \(appointmentId) not found")
+        default:
+            throw NetworkError.serverError("Status code: \(httpResponse.statusCode)")
+        }
     }
     
     // MARK: - Fetch Doctor Shifts
@@ -167,80 +235,86 @@ class DoctorServices {
     
     // MARK: - Fetch Patient Profile
     func fetchPatientProfile(patientId: String) async throws -> DoctorResponse.PatientProfile {
-            // Implement the patient profile fetching logic
-            guard let url = URL(string: "\(Constants.baseURL)/api/hospital/general/patients/\(patientId)/") else {
-                throw NetworkError.invalidURL
-            }
-            
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-            let token = UserDefaults.accessToken
-            request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            
-            let (data, response) = try await session.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw NetworkError.invalidResponse
-            }
-            
-            switch httpResponse.statusCode {
-            case 200...299:
-                do {
-                    let decoder = JSONDecoder()
-                    let patientProfile = try decoder.decode(DoctorResponse.PatientProfile.self, from: data)
-                    return patientProfile
-                } catch {
-                    throw NetworkError.decodingError
-                }
-            case 401:
-                throw NetworkError.unauthorized
-            case 404:
-                throw NetworkError.notFound("Patient with ID \(patientId) not found")
-            default:
-                throw NetworkError.serverError("Status code: \(httpResponse.statusCode)")
-            }
+        guard let url = buildURL(endpoint: DoctorEndpoints.Patient.profile(patientId: patientId)) else {
+            print("[SwatiSwapna] Invalid URL for patient profile")
+            throw NetworkError.invalidURL
         }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("Bearer \(UserDefaults.accessToken)", forHTTPHeaderField: "Authorization")
+        
+        print("[SwatiSwapna] Fetching patient profile from: \(url.absoluteString)")
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        print("[SwatiSwapna] Patient profile status: \(httpResponse.statusCode)")
+        switch httpResponse.statusCode {
+        case 200...299:
+            do {
+                let decoder = JSONDecoder()
+                let profile = try decoder.decode(DoctorResponse.PatientProfile.self, from: data)
+                print("[SwatiSwapna] Successfully decoded patient profile for patient \(profile.patientId)")
+                return profile
+            } catch {
+                print("[SwatiSwapna] Decoding error: \(error)")
+                if let rawData = String(data: data, encoding: .utf8) {
+                    print("[SwatiSwapna] Raw response: \(rawData)")
+                }
+                throw NetworkError.decodingError
+            }
+        case 401:
+            print("[SwatiSwapna] Unauthorized access when fetching patient profile")
+            throw NetworkError.unauthorized
+        default:
+            throw NetworkError.serverError("Status code: \(httpResponse.statusCode)")
+        }
+    }
     
     // MARK: - Fetch Patient Latest Vitals
     func fetchPatientLatestVitals(patientId: String) async throws -> DoctorResponse.DocGetLatestPatientVitals {
-        print("huraayyyyyyy")
-            // Implement the vitals fetching logic
-            guard let url = URL(string: "\(Constants.baseURL)/hospital/doctor/patients/\(patientId)/latest-vitals/") else {
-                throw NetworkError.invalidURL
-            }
-            
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-            let token = UserDefaults.accessToken
-            request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            
-            let (data, response) = try await session.data(for: request)
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw NetworkError.invalidResponse
-            }
-        
-                
-            switch httpResponse.statusCode {
-            case 200...299:
-                do {
-                    let decoder = JSONDecoder()
-                    let vitals = try decoder.decode(DoctorResponse.DocGetLatestPatientVitals.self, from: data)
-                    print(vitals)
-                    return vitals
-                } catch {
-                    throw NetworkError.decodingError
-                }
-            case 401:
-                throw NetworkError.unauthorized
-            case 404:
-                throw NetworkError.notFound("Vitals for patient with ID \(patientId) not found")
-            default:
-                throw NetworkError.serverError("Status code: \(httpResponse.statusCode)")
-            }
+        guard let url = buildURL(endpoint: DoctorEndpoints.Patient.latestVitals(patientId: patientId)) else {
+            print("[SwatiSwapna] Invalid URL for patient vitals")
+            throw NetworkError.invalidURL
         }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("Bearer \(UserDefaults.accessToken)", forHTTPHeaderField: "Authorization")
+        
+        print("[SwatiSwapna] Fetching latest vitals from: \(url.absoluteString)")
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        print("[SwatiSwapna] Latest vitals status: \(httpResponse.statusCode)")
+        switch httpResponse.statusCode {
+        case 200...299:
+            do {
+                let decoder = JSONDecoder()
+                let vitals = try decoder.decode(DoctorResponse.DocGetLatestPatientVitals.self, from: data)
+                print("[SwatiSwapna] Successfully decoded patient vitals from \(vitals.createdAt)")
+                return vitals
+            } catch {
+                print("[SwatiSwapna] Decoding error: \(error)")
+                if let rawData = String(data: data, encoding: .utf8) {
+                    print("[SwatiSwapna] Raw vitals response: \(rawData)")
+                }
+                throw NetworkError.decodingError
+            }
+        case 401:
+            throw NetworkError.unauthorized
+        default:
+            throw NetworkError.serverError("Status code: \(httpResponse.statusCode)")
+        }
+    }
     
     // MARK: - Enter Vitals
     func enterVitals(appointmentId: Int, vitals: PostVitals) async throws -> DoctorResponse.EnterVitals {
@@ -613,99 +687,4 @@ class DoctorServices {
         case decodingError
     }
     
-}
-
-
-// Extensions to DoctorServices for Diagnosis and Prescription
-// Extension to DoctorServices to fetch detailed appointment info
-extension DoctorServices {
-    // In DoctorServices.swift:
-    // Add diagnostic logging to fetchAppointmentDetails:
-
-    func fetchAppointmentDetails(appointmentId: Int) async throws -> AppointmentDetailResponse {
-        guard let url = URL(string: "http://ec2-13-127-223-203.ap-south-1.compute.amazonaws.com/api/hospital/general/appointments/\(appointmentId)/") else {
-            print("[SwatiSwapna] Invalid URL for appointment details")
-            throw NetworkError.invalidURL
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        let token = UserDefaults.accessToken
-        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
-        print("[SwatiSwapna] Fetching details for appointmentId: \(appointmentId)")
-        print("[SwatiSwapna] Constructed URL: \(url.absoluteString)")
-        print("[SwatiSwapna] Request headers: \(request.allHTTPHeaderFields ?? [:])")
-        print("[SwatiSwapna] Access token: \(token.isEmpty ? "Empty" : "Present")")
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.invalidResponse
-        }
-        
-        print("[SwatiSwapna] Appointment details status: \(httpResponse.statusCode)")
-        if let rawData = String(data: data, encoding: .utf8) {
-            print("[SwatiSwapna] Raw response: \(rawData)")
-        }
-        
-        switch httpResponse.statusCode {
-        case 200...299:
-            do {
-                let decoder = JSONDecoder()
-                let appointmentDetails = try decoder.decode(AppointmentDetailResponse.self, from: data)
-                print("[SwatiSwapna] Successfully decoded appointment details for ID: \(appointmentDetails.appointmentId)")
-                
-                // Add these diagnostic prints
-                print("[DEBUG] Appointment date from API: \(appointmentDetails.date)")
-                
-                // Log parsed date to verify format
-                let isoFormatter = DateFormatter()
-                isoFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
-                
-                let simpleFormatter = DateFormatter()
-                simpleFormatter.dateFormat = "yyyy-MM-dd"
-                
-                if let date = isoFormatter.date(from: appointmentDetails.date) {
-                    print("[DEBUG] Successfully parsed as ISO date: \(date)")
-                } else if let date = simpleFormatter.date(from: appointmentDetails.date) {
-                    print("[DEBUG] Successfully parsed as simple date: \(date)")
-                } else {
-                    print("[DEBUG] Could not parse date format: \(appointmentDetails.date)")
-                }
-                
-                return appointmentDetails
-            } catch {
-                print("[SwatiSwapna] Decoding error: \(error)")
-                throw NetworkError.decodingError
-            }
-        case 401:
-            throw NetworkError.unauthorized
-        case 404:
-            throw NetworkError.notFound("Appointment with ID \(appointmentId) not found")
-        default:
-            throw NetworkError.serverError("Status code: \(httpResponse.statusCode)")
-        }
-    }
-}
-
-// Additional response model for Medications
-struct PrescriptionMedicationResponse: Codable, Identifiable {
-    var id: Int { medicationId }
-    let medicationId: Int
-    let medicineName: String
-    let dosage: String
-    let frequency: String
-    let duration: String
-    let fastingRequired: Bool
-    
-    enum CodingKeys: String, CodingKey {
-        case medicationId = "medication_id"
-        case medicineName = "medicine_name"
-        case dosage
-        case frequency
-        case duration
-        case fastingRequired = "fasting_required"
-    }
 }

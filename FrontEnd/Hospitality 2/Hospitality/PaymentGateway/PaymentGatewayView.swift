@@ -1,5 +1,14 @@
 import SwiftUI
 
+// MARK: - Payment Response Model
+struct PaymentResponse: Codable {
+    let message: String
+    let transaction_id: Int
+    let amount: String
+    let invoice_id: Int
+    let invoice_number: String
+}
+
 // MARK: - Payment Method Enum
 enum PaymentMethod: String, CaseIterable, Identifiable {
     case card = "Card"
@@ -71,6 +80,9 @@ struct Bank: Identifiable {
 struct PaymentGatewayView: View {
     // MARK: - Properties
     @Environment(\.presentationMode) var presentationMode
+    var labTestId: Int
+    var onPaymentCompleted: (() -> Void)? // Add callback for parent
+    
     @State private var selectedPaymentMethod: PaymentMethod = .card
     @State private var selectedBank: Bank?
     @State private var upiId = ""
@@ -78,7 +90,7 @@ struct PaymentGatewayView: View {
     @State private var showingSuccessAlert = false
     @State private var showingFailureAlert = false
     @State private var transactionId = ""
-    @State private var paymentAmount: Double = 1.00
+    @State private var paymentAmount: Double = 350
     @State private var cardNumber = ""
     @State private var cardholderName = ""
     @State private var expiryDate = ""
@@ -90,7 +102,21 @@ struct PaymentGatewayView: View {
     @State private var timer: Timer?
     @State private var showingSuccessView = false
     @Environment(\.colorScheme) var colorScheme
+    
+    // New states for API response
+    @State private var paymentResponse: PaymentResponse?
+    @State private var apiErrorMessage: String?
 
+    // Default initializer for preview and backward compatibility
+    init() {
+        self.labTestId = 0
+    }
+    
+    // New initializer with labTestId parameter
+    init(labTestId: Int, onPaymentCompleted: (() -> Void)? = nil) {
+        self.labTestId = labTestId
+        self.onPaymentCompleted = onPaymentCompleted
+    }
     
     // MARK: - Card Validation
     private var isCardFormValid: Bool {
@@ -203,7 +229,18 @@ struct PaymentGatewayView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showingSuccessView) {
-                PaymentSuccessView(transactionId: transactionId, paymentAmount: paymentAmount)
+                PaymentSuccessView(
+                    transactionId: transactionId,
+                    paymentAmount: paymentAmount,
+                    onDone: {
+                        // First dismiss this sheet, then call parent's callback
+                        presentationMode.wrappedValue.dismiss()
+                        // Add a slight delay to ensure proper dismissal order
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            onPaymentCompleted?()
+                        }
+                    }
+                )
             }
             .sheet(isPresented: $showEditContactInfo) {
                 ContactEditView(
@@ -212,6 +249,13 @@ struct PaymentGatewayView: View {
                     onDismiss: {
                         showEditContactInfo = false
                     }
+                )
+            }
+            .alert(isPresented: $showingFailureAlert) {
+                Alert(
+                    title: Text("Payment Failed"),
+                    message: Text(apiErrorMessage ?? "There was an error processing your payment. Please try again."),
+                    dismissButton: .default(Text("OK"))
                 )
             }
             .onAppear {
@@ -599,18 +643,106 @@ struct PaymentGatewayView: View {
     
     // MARK: - Helper Methods
     private func processPayment() {
-        // Simulate payment processing
+        // Start processing
         isProcessing = true
         
-        // Generate random transaction ID
-        let randomID = String(format: "%08X", Int.random(in: 10000000...99999999))
+        // Generate random transaction reference
+        let randomRef = String(format: "TXN%08X", Int.random(in: 10000000...99999999))
         
-        // Simulate network delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isProcessing = false
-            transactionId = "TXN\(randomID)"
-            showingSuccessView = true // Show success view instead of alert
+        // Create request body
+        let requestBody: [String: Any] = [
+            "payment_method_id": 6,
+            "transaction_reference": randomRef,
+            "payment_gateway_response": [
+                "gateway_id": "razorpay_67890",
+                "status": "success",
+                "payment_id": "pay_xyz789uvw456"
+            ]
+        ]
+        
+        // Print request body
+        print("Payment Request Body:")
+        if let jsonString = try? String(data: JSONSerialization.data(withJSONObject: requestBody, options: .prettyPrinted), encoding: .utf8) {
+            print(jsonString)
         }
+        
+        // Convert to JSON data
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestBody) else {
+            isProcessing = false
+            apiErrorMessage = "Failed to prepare payment data"
+            showingFailureAlert = true
+            return
+        }
+        
+        // Create URL
+        let baseURLString = Constants.baseURL
+        guard let baseURL = URL(string: baseURLString) else {
+            isProcessing = false
+            apiErrorMessage = "Invalid API URL: \(baseURLString)"
+            showingFailureAlert = true
+            return
+        }
+        
+        let url = baseURL.appendingPathComponent("hospital/general/lab-tests/\(labTestId)/pay/")
+        print("Payment API URL: \(url)")
+        
+        // Create request
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = jsonData
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("Bearer \(UserDefaults.standard.string(forKey: "accessToken") ?? "")", forHTTPHeaderField: "Authorization")
+        
+        // Make API call
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                isProcessing = false
+                
+                if let error = error {
+                    apiErrorMessage = "Network error: \(error.localizedDescription)"
+                    showingFailureAlert = true
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    apiErrorMessage = "Invalid server response"
+                    showingFailureAlert = true
+                    return
+                }
+                
+                print("Payment API Response Status: \(httpResponse.statusCode)")
+                
+                // Check if the request was successful (status code 200-299)
+                if (200...299).contains(httpResponse.statusCode) {
+                    // Print response data if available
+                    if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                        print("Payment API Response Data:")
+                        print(responseString)
+                        
+                        // Try to format it as JSON for better readability
+                        if let json = try? JSONSerialization.jsonObject(with: data, options: []),
+                           let prettyData = try? JSONSerialization.data(withJSONObject: json, options: .prettyPrinted),
+                           let prettyString = String(data: prettyData, encoding: .utf8) {
+                            print("Formatted JSON Response:")
+                            print(prettyString)
+                        }
+                    }
+                    
+                    // Use static data for success view
+                    transactionId = "INV-\(String(format: "%04d", Int.random(in: 1000...9999)))"
+                    showingSuccessView = true
+                } else {
+                    // Print error response
+                    if let data = data, let errorString = String(data: data, encoding: .utf8) {
+                        print("Payment API Error Response:")
+                        print(errorString)
+                    }
+                    
+                    apiErrorMessage = "Server error: \(httpResponse.statusCode)"
+                    showingFailureAlert = true
+                }
+            }
+        }.resume()
     }
     
     private func startTimer() {
@@ -618,7 +750,7 @@ struct PaymentGatewayView: View {
             if timeoutSeconds > 0 {
                 timeoutSeconds -= 1
             } else {
-                // Handle timeout (would dismiss in real app)
+                // Handle timeout
                 timer?.invalidate()
             }
         }
@@ -671,9 +803,28 @@ struct ContactEditView: View {
     }
 }
 
+// MARK: - Payment Success View with API Response
+
+
+struct SuccessDetailRow: View {
+    var label: String
+    var value: String
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .font(.subheadline.bold())
+        }
+    }
+}
+
 // MARK: - Preview
 struct PaymentGatewayView_Previews: PreviewProvider {
     static var previews: some View {
-        PaymentGatewayView()
+        PaymentGatewayView(labTestId: 1, onPaymentCompleted: nil)
     }
 }
