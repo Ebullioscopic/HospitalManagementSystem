@@ -8,13 +8,17 @@ struct AppointmentDetailsView: View {
     @State private var currentUser = "swatiswapna"
     @Environment(\.colorScheme) var colorScheme
     
+    private let accentBlue = Color(hex: "0077CC")
+    private let lightBlue = Color(hex: "E6F0FA")
+    private let darkBlue = Color(hex: "005599")
+
     var body: some View {
         ZStack {
-            // Background gradient
+            // Background gradient with blue tones
             LinearGradient(
                 gradient: Gradient(colors: [
-                    colorScheme == .dark ? Color(hex: "101420") : Color(hex: "E8F5FF"),
-                    colorScheme == .dark ? Color(hex: "1A202C") : Color(hex: "F0F8FF")
+                    colorScheme == .dark ? Color(hex: "0A1B2F") : lightBlue,
+                    colorScheme == .dark ? Color(hex: "14243D") : Color(hex: "F0F8FF")
                 ]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -29,6 +33,7 @@ struct AppointmentDetailsView: View {
                             Text("Appointment #\(appointment.appointmentId)")
                                 .font(.title2)
                                 .fontWeight(.bold)
+                                .foregroundColor(darkBlue)
                             
                             Text(formattedDate(appointment.date))
                                 .font(.subheadline)
@@ -40,8 +45,9 @@ struct AppointmentDetailsView: View {
                         StatusBadge(status: appointment.status)
                     }
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(lightBlue.opacity(0.9))
                     .cornerRadius(12)
+                    .shadow(color: accentBlue.opacity(0.2), radius: 5)
                     
                     // Patient information section
                     PatientInfoSection(
@@ -69,6 +75,7 @@ struct AppointmentDetailsView: View {
             }
         }
         .navigationTitle("Appointment Details")
+        .tint(accentBlue)
         .onAppear {
             // Set specific current date and user
             let dateFormatter = DateFormatter()
@@ -98,6 +105,9 @@ struct PatientInfoSection: View {
     let patientId: Int
     @ObservedObject var viewModel: DoctorViewModel
     
+    private let accentBlue = Color(hex: "0077CC")
+    private let lightBlue = Color(hex: "E6F0FA")
+
     var body: some View {
         GroupBox(label: SectionHeader(title: "Patient Information", icon: "person")) {
             if let patientProfile = viewModel.patientProfile {
@@ -120,6 +130,7 @@ struct PatientInfoSection: View {
                 HStack {
                     Spacer()
                     ProgressView("Loading patient information...")
+                        .tint(accentBlue)
                     Spacer()
                 }
                 .padding()
@@ -133,18 +144,25 @@ struct PatientInfoSection: View {
                         viewModel.fetchPatientProfile(patientId: String(patientId))
                     }
                     .buttonStyle(.bordered)
+                    .tint(accentBlue)
                     .padding(.top, 8)
                 }
                 .padding()
                 .frame(maxWidth: .infinity)
             }
         }
+        .background(lightBlue.opacity(0.9))
+        .cornerRadius(12)
+        .shadow(color: accentBlue.opacity(0.2), radius: 5)
     }
 }
 
 struct AppointmentInfoSection: View {
     let appointment: DoctorResponse.DocAppointment
     
+    private let accentBlue = Color(hex: "0077CC")
+    private let lightBlue = Color(hex: "E6F0FA")
+
     var body: some View {
         GroupBox(label: SectionHeader(title: "Appointment Details", icon: "calendar")) {
             VStack(alignment: .leading, spacing: 12) {
@@ -155,12 +173,18 @@ struct AppointmentInfoSection: View {
                 DetailRow(label: "Status", value: appointment.status)
             }
         }
+        .background(lightBlue.opacity(0.9))
+        .cornerRadius(12)
+        .shadow(color: accentBlue.opacity(0.2), radius: 5)
     }
 }
 
 struct VitalsSection: View {
     let vitals: DoctorResponse.DocGetLatestPatientVitals
     
+    private let accentBlue = Color(hex: "0077CC")
+    private let lightBlue = Color(hex: "E6F0FA")
+
     var body: some View {
         GroupBox(label: SectionHeader(title: "Latest Vitals", icon: "heart.text.square")) {
             VStack(alignment: .leading, spacing: 12) {
@@ -173,6 +197,9 @@ struct VitalsSection: View {
                 DetailRow(label: "Appointment ID", value: "\(vitals.appointmentId)")
             }
         }
+        .background(lightBlue.opacity(0.9))
+        .cornerRadius(12)
+        .shadow(color: accentBlue.opacity(0.2), radius: 5)
     }
 }
 
@@ -183,14 +210,15 @@ struct ActionButtonsSection: View {
     let isAppointmentCompleted: Bool
     var viewModel = DoctorViewModel()
     
-    
+    private let accentBlue = Color(hex: "0077CC")
+
     var body: some View {
         if !isAppointmentCompleted {
             NavigationLink(destination: VitalsFormView(appointmentId: appointmentId, viewModel: viewModel)) {
                 ActionButtonContent(
                     icon: "play.circle.fill",
                     title: "Start Appointment",
-                    color: .green
+                    color: accentBlue
                 )
                 .padding(.top, 16)
             }
@@ -204,9 +232,12 @@ struct SectionHeader: View {
     let title: String
     let icon: String
     
+    private let accentBlue = Color(hex: "0077CC")
+
     var body: some View {
         Label(title, systemImage: icon)
             .font(.headline)
+            .foregroundColor(accentBlue)
     }
 }
 
@@ -247,15 +278,13 @@ struct ActionButtonContent: View {
             Text(title)
                 .font(.caption)
                 .fontWeight(.medium)
+                .foregroundColor(color)
         }
         .frame(maxWidth: .infinity)
     }
 }
 
-
 // MARK: - Vitals Form
-
-import SwiftUI
 
 struct VitalsFormView: View {
     let appointmentId: Int
@@ -281,7 +310,7 @@ struct VitalsFormView: View {
         range: 40...200,
         placeholder: "Heart Rate (bpm)",
         icon: "heart.fill",
-        iconColor: Color.red.opacity(0.6)
+        iconColor: Color(hex: "0077CC")
     )
     
     @State private var spo2Input = ValidatedInput(
@@ -295,26 +324,26 @@ struct VitalsFormView: View {
         range: 90...108,
         placeholder: "Temperature (°F)",
         icon: "thermometer",
-        iconColor: Color(hex: "F5A623")
+        iconColor: Color(hex: "0077CC")
     )
     
     @Environment(\.dismiss) private var dismiss
     
     // MARK: - Color Scheme
     private let primaryColor = Color(hex: "0077CC")
-    private let secondaryColor = Color(hex: "00A3A3")
-    private let accentColor = Color(hex: "F5A623")
+    private let secondaryColor = Color(hex: "005599")
+    private let lightBlue = Color(hex: "E6F0FA")
     
     // Navigation state
     @State private var navigateToConsultation = false
     
     var body: some View {
         ZStack {
-            // Background gradient
+            // Background gradient with blue tones
             LinearGradient(
                 gradient: Gradient(colors: [
-                    colorScheme == .dark ? Color(hex: "101420") : Color(hex: "E8F5FF"),
-                    colorScheme == .dark ? Color(hex: "1A202C") : Color(hex: "F0F8FF")
+                    colorScheme == .dark ? Color(hex: "0A1B2F") : lightBlue,
+                    colorScheme == .dark ? Color(hex: "14243D") : Color(hex: "F0F8FF")
                 ]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -327,11 +356,11 @@ struct VitalsFormView: View {
                         // Vital signs form
                         VStack(spacing: 16) {
                             // Each vital sign input with consistent styling
-                            VitalFieldView(input: $heightInput)
-                            VitalFieldView(input: $weightInput)
-                            VitalFieldView(input: $heartRateInput)
-                            VitalFieldView(input: $spo2Input)
-                            VitalFieldView(input: $temperatureInput)
+                            VitalFieldView(input: $heightInput, accentBlue: primaryColor)
+                            VitalFieldView(input: $weightInput, accentBlue: primaryColor)
+                            VitalFieldView(input: $heartRateInput, accentBlue: primaryColor)
+                            VitalFieldView(input: $spo2Input, accentBlue: primaryColor)
+                            VitalFieldView(input: $temperatureInput, accentBlue: primaryColor)
                         }
                         .padding(.horizontal)
                         
@@ -342,13 +371,13 @@ struct VitalsFormView: View {
                                     HStack {
                                         Spacer()
                                         ProgressView("Saving vitals...")
-                                            .progressViewStyle(CircularProgressViewStyle())
+                                            .progressViewStyle(CircularProgressViewStyle(tint: primaryColor))
                                         Spacer()
                                     }
                                 } else if !viewModel.enterVitalsMessage.isEmpty {
                                     StatusView(
                                         icon: "checkmark.circle.fill",
-                                        color: .green,
+                                        color: primaryColor,
                                         message: viewModel.enterVitalsMessage
                                     )
                                 } else if let errorMessage = viewModel.errorMessage {
@@ -362,10 +391,7 @@ struct VitalsFormView: View {
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .fill(colorScheme == .dark ?
-                                        Color(UIColor.secondarySystemBackground) :
-                                        Color(UIColor.tertiarySystemBackground)
-                                    )
+                                    .fill(lightBlue.opacity(0.9))
                             )
                             .padding(.horizontal)
                         }
@@ -430,14 +456,14 @@ struct VitalsFormView: View {
                 .padding(.vertical, 12)
                 .background(
                     Rectangle()
-                        .fill(colorScheme == .dark ? Color(hex: "101420").opacity(0.9) : Color(hex: "F7FAFF").opacity(0.9))
-                        .blur(radius: 3)
-                        .shadow(color: Color.black.opacity(0.1), radius: 5, y: -5)
+                        .fill(colorScheme == .dark ? Color(hex: "0A1B2F").opacity(0.9) : lightBlue.opacity(0.9))
+                        .shadow(color: primaryColor.opacity(0.2), radius: 5, y: -5)
                 )
             }
         }
         .navigationTitle("Enter Vitals")
         .navigationBarTitleDisplayMode(.inline)
+        .tint(primaryColor)
     }
     
     // MARK: - Properties
@@ -521,14 +547,17 @@ struct ValidatedInput {
 /// View for each vital sign input field
 struct VitalFieldView: View {
     @Binding var input: ValidatedInput
+    let accentBlue: Color // Pass accentBlue as a parameter
     @Environment(\.colorScheme) var colorScheme
     
+    private let lightBlue = Color(hex: "E6F0FA")
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Field label
             Text(input.placeholder)
                 .font(.subheadline)
-                .foregroundColor(.primary)
+                .foregroundColor(accentBlue)
             
             // Input field
             HStack(spacing: 12) {
@@ -558,7 +587,7 @@ struct VitalFieldView: View {
                 if input.showValidation {
                     if !input.text.isEmpty {
                         Image(systemName: input.isValid ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                            .foregroundColor(input.isValid ? .green : .red)
+                            .foregroundColor(input.isValid ? accentBlue : .red)
                             .font(.system(size: 16))
                             .transition(.scale.combined(with: .opacity))
                     }
@@ -567,13 +596,13 @@ struct VitalFieldView: View {
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(colorScheme == .dark ? Color(UIColor.secondarySystemBackground) : Color.white)
+                    .fill(lightBlue.opacity(0.9))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(
                         input.showValidation && !input.text.isEmpty ?
-                            (input.isValid ? Color.green.opacity(0.4) : Color.red.opacity(0.5)) :
+                            (input.isValid ? accentBlue.opacity(0.4) : Color.red.opacity(0.5)) :
                             Color.gray.opacity(0.2),
                         lineWidth: 1
                     )

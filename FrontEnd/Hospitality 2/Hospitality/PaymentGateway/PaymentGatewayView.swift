@@ -231,7 +231,6 @@ struct PaymentGatewayView: View {
             .sheet(isPresented: $showingSuccessView) {
                 PaymentSuccessView(
                     transactionId: transactionId,
-                    paymentAmount: paymentAmount,
                     onDone: {
                         // First dismiss this sheet, then call parent's callback
                         presentationMode.wrappedValue.dismiss()

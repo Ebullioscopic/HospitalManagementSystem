@@ -4,8 +4,10 @@ struct PaymentSuccessView: View {
     // MARK: - Properties
     @Environment(\.presentationMode) var presentationMode
     let transactionId: String
-    let paymentAmount: Double
     var onDone: (() -> Void)? // Add completion handler
+    
+    // Static amount
+    let staticAmount: Double = 350.0
     
     // Animation states
     @State private var showCircle = false
@@ -76,7 +78,7 @@ struct PaymentSuccessView: View {
                 
                 // Payment details
                 VStack(spacing: 16) {
-                    // Amount
+                    // Amount - Always show 350.00
                     HStack {
                         Text("Amount Paid:")
                             .font(.headline)
@@ -84,7 +86,7 @@ struct PaymentSuccessView: View {
                         
                         Spacer()
                         
-                        Text("₹\(String(format: "%.2f", paymentAmount))")
+                        Text("₹\(String(format: "%.2f", staticAmount))")
                             .font(.title3)
                             .fontWeight(.bold)
                             .foregroundColor(Color(hex: "333333"))
@@ -107,7 +109,7 @@ struct PaymentSuccessView: View {
                     
                     Divider()
                     
-                    // Date and time
+                    // Date and time - shows current date and time
                     HStack {
                         Text("Date & Time:")
                             .font(.headline)
@@ -226,6 +228,6 @@ struct ConfettiPiece: View {
 // MARK: - Preview
 struct PaymentSuccessView_Previews: PreviewProvider {
     static var previews: some View {
-        PaymentSuccessView(transactionId: "TXN12345678", paymentAmount: 1999.00)
+        PaymentSuccessView(transactionId: "TXN12345678")
     }
 }
